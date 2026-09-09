@@ -1,0 +1,12 @@
+## Interface: 120100
+## Title: |cffff7f00Skillissue M+ helper
+## Notes: Special addon created for |cffff7f00improving your progress in m+
+## Author: Skillissue
+## Version: 1.0.0
+## IconTexture: Interface\AddOns\SkillissueMplus\Media\Icon.blp
+## X-Curse-Project-ID: 999999
+## SavedVariables: SkillissueMplus
+## SavedVariablesPerCharacter: SkillissueMplus
+## OptionalDeps: ElvUI, EllesmereUI, LibSharedMedia-3.0
+
+UICore.lua

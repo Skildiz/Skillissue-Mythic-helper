@@ -17,5 +17,8 @@
     "Lua.diagnostics.globals": [
         "WorldMapFrame",
         "SlashCmdList"
+    ],
+    "Lua.diagnostics.disable": [
+        "unbalanced-assignments"
     ]
 }

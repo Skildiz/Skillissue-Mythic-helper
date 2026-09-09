@@ -10,3 +10,4 @@
 ## OptionalDeps: ElvUI, EllesmereUI, LibSharedMedia-3.0
 
 UICore.lua
+Style.lua

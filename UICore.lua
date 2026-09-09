@@ -1,42 +1,67 @@
-print("|cffff7f00Skillissue M+ helper successfully loaded! Type /mhelper or /sh to open the settings window.")
+local addonName, sframe = ...
 
--- Addon settings window
-local f = CreateFrame("Frame", "f", UIParent, "BasicFrameTemplateWithInset")
-f:SetSize(500, 350)
-f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-f.TitleBg:SetHeight(30)
-f.title = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-f.title:SetPoint("TOPLEFT", f.TitleBg, "TOPLEFT", 5, -3)
-f.title:SetText("Skillissue M+ Helper")
-f:Hide()
+local eventHandler = CreateFrame("Frame")
+eventHandler:RegisterEvent("ADDON_LOADED")
 
--- Make the frame draggable
-f:EnableMouse(true)
-f:SetMovable(true)
-f:RegisterForDrag("LeftButton")
-f:SetScript("OnDragStart", function(self)
-	self:StartMoving()
-end)
-f:SetScript("OnDragStop", function(self)
-	self:StopMovingOrSizing()
-end)
+eventHandler:SetScript("OnEvent", function(frame, _, loadedAddonName)
+    if loadedAddonName ~= addonName then return end
 
-f:SetScript("OnShow", function()
-        PlaySound(808)
-end)
+    local Style = sframe.Style
 
-f:SetScript("OnHide", function()
-        PlaySound(808)
-end)
+    -- Chat message after logging in
 
--- Chat command to toggle the settings window
+    print("|cffff7f00Skillissue M+ helper successfully loaded! Type /smhelper or /sh to open the settings window.|r")
 
-SLASH_SKILLHELPER1 = "/smhelper"
-SLASH_SKILLHELPER2 = "/sh"
-SlashCmdList["SKILLHELPER"] = function()
-    if f:IsShown() then
-        f:Hide()
-    else
-        f:Show()
+    -- Main settings frame
+    local f = Style:CreatePanel(UIParent, 500, 350, "SkillissueSettingsFrame")
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    f:Hide()
+
+    f:EnableMouse(true)
+    f:SetMovable(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+
+    local header = Style:CreateHeader(f, "Skillissue M+ Helper", 30)
+
+    -- Close button
+    local closeBtn = CreateFrame("Button", nil, header)
+    closeBtn:SetSize(18, 18)
+    closeBtn:SetPoint("RIGHT", header, "RIGHT", -6, 0)
+    closeBtn:EnableMouse(true)
+    closeBtn:SetFrameLevel(header:GetFrameLevel() + 5)
+    
+    closeBtn.text = closeBtn:CreateFontString(nil, "OVERLAY")
+    Style:ApplyFont(closeBtn.text, 10, "OUTLINE")
+    closeBtn.text:SetText("X")
+    closeBtn.text:SetPoint("CENTER", closeBtn, "CENTER", 0, 0)
+    closeBtn.text:SetTextColor(0.7, 0.7, 0.7)
+
+    closeBtn:SetScript("OnClick", function() 
+        f:Hide() 
+    end)
+    closeBtn:SetScript("OnEnter", function(button) 
+        button.text:SetTextColor(1, 0.2, 0.2) 
+    end)
+    closeBtn:SetScript("OnLeave", function(button) 
+        button.text:SetTextColor(0.7, 0.7, 0.7) 
+    end)
+
+    -- Sound effects on show/hide
+    f:SetScript("OnShow", function() PlaySound(808) end)
+    f:SetScript("OnHide", function() PlaySound(808) end)
+
+    -- Slash command to toggle the settings frame
+    SLASH_SKILLHELPER1 = "/smhelper"
+    SLASH_SKILLHELPER2 = "/sh"
+    SlashCmdList["SKILLHELPER"] = function()
+        if f:IsShown() then
+            f:Hide()
+        else
+            f:Show()
+        end
     end
-end
+
+    frame:UnregisterEvent("ADDON_LOADED")
+end)

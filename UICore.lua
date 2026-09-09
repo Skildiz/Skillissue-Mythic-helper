@@ -13,7 +13,7 @@ eventHandler:SetScript("OnEvent", function(frame, _, loadedAddonName)
     print("|cffff7f00Skillissue M+ helper successfully loaded! Type /smhelper or /sh to open the settings window.|r")
 
     -- Main settings frame
-    local f = Style:CreatePanel(UIParent, 500, 350, "SkillissueSettingsFrame")
+    local f = Style:CreatePanel(UIParent, 1250, 850, "SkillissueSettingsFrame")
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     f:Hide()
 
@@ -22,6 +22,8 @@ eventHandler:SetScript("OnEvent", function(frame, _, loadedAddonName)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", function(self) self:StartMoving() end)
     f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+    f:SetFrameStrata("HIGH")
+    f:SetFrameLevel(100)
 
     local header = Style:CreateHeader(f, "Skillissue M+ Helper", 30)
 

@@ -9,6 +9,7 @@ SMhelper.UI:RegisterPage("qualityOfLife", {
         local W = SMhelper.UI.Widgets
         local Config = SMhelper.Config
         local module = SMhelper.Modules and SMhelper.Modules.CombatLogging
+        local repairModule = SMhelper.Modules and SMhelper.Modules.AutoRepair
 
         local page = CreateFrame("Frame", nil, parent)
         local title = API:CreateLabel(page, "Quality of Life", {
@@ -83,6 +84,28 @@ SMhelper.UI:RegisterPage("qualityOfLife", {
 
         triggers:Refresh()
         applyDependentState()
+
+        -- auto repair settings
+        if repairModule then
+            y = y - 8
+
+            local _, repairHeaderH = W:SectionHeader(body, "AUTO REPAIR", y)
+            y = y - repairHeaderH
+
+            -- row 3: Enable Auto Repair
+            local row3 = W:Row(body, y)
+
+            -- Enable Auto Repair toggle
+            W:RowToggle(
+                row3.Left,
+                "Enable Auto Repair",
+                repairModule:IsEnabled(),
+                function(value)
+                    repairModule:SetEnabled(value)
+                end,
+                "Automatically repairs damaged equipment when opening a repair merchant. Guild repair funds are used when available."
+            )
+        end
 
         return page
     end,

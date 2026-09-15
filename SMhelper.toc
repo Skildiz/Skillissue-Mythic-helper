@@ -1,8 +1,8 @@
-## Interface: 120000
+## Interface: 120100
 ## Title: |cff3399ffSkillissue M+ Helper
 ## Notes: Special addon created for |cff3399ffSkillissue your progress in m+
 ## Author: Skillissue
-## Version: 0.2.2
+## Version: 0.3.0
 ## SavedVariables: SMhelperDB
 
 Config.lua
@@ -14,6 +14,7 @@ UI/Content.lua
 UI/MainWindow.lua
 Modules/BuffReminder.lua
 Modules/CombatLogging.lua
+Modules/AutoRepair.lua
 UI/Pages/General.lua
 UI/Pages/QualityOfLife.lua
 UI/Pages/BuffReminder.lua

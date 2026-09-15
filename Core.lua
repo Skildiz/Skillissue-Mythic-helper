@@ -23,6 +23,12 @@ eventFrame:SetScript("OnEvent", function(self, event, loadedAddon)
     if combatLogging then
         combatLogging:Initialize(SMhelperDB.combatLogging)
     end
+    local autoRepair = SMhelper.Modules
+        and SMhelper.Modules.AutoRepair
+
+    if autoRepair then
+        autoRepair:Initialize(SMhelperDB.autoRepair)
+    end
     local minimap = SMhelper.UI
         and SMhelper.UI.Minimap
 

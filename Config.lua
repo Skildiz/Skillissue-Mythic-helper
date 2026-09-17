@@ -1,6 +1,8 @@
 local _, SMhelper = ...
 
 SMhelper.Config = {
+
+    -- Window settings
     width = 1250,
     height = 850,
     minWidth = 900,
@@ -9,12 +11,14 @@ SMhelper.Config = {
     headerHeight = 50,
     padding = 12,
 
+    -- Addon settings
     defaultPage = "general",
     addonName = "SMHelper",
     title = "Skillissue M+ helper",
     frameStrata = "DIALOG",
     frameLevel = 100,
 
+    -- File and texture paths
     paths = {
         borderTexture = "Interface\\Buttons\\WHITE8X8",
         backgroundTexture = "Interface\\DialogFrame\\UI-DialogBox-Background",

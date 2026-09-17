@@ -89,7 +89,7 @@ SMhelper.UI:RegisterPage("qualityOfLife", {
         if repairModule then
             y = y - 8
 
-            local _, repairHeaderH = W:SectionHeader(body, "AUTO REPAIR", y)
+            local _, repairHeaderH = W:SectionHeader(body, "GENERAL", y)
             y = y - repairHeaderH
 
             -- row 3: Enable Auto Repair
@@ -105,8 +105,16 @@ SMhelper.UI:RegisterPage("qualityOfLife", {
                 end,
                 "Automatically repairs damaged equipment when opening a repair merchant. Guild repair funds are used when available."
             )
+            W:RowToggle(
+                row3.Right,
+                "Auto-fill delete confirmation",
+                repairModule:IsEnabled(),
+                function(value)
+                    repairModule:SetEnabled(value)
+                end,
+                "Automatically types 'DELETE' when trying to delete a valuable item."
+            )
         end
-
         return page
     end,
 })

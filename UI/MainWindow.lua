@@ -1,37 +1,28 @@
 local _, SMhelper = ...
 
--- main window composition and public UI methods
-local UI, Config = SMhelper.UI, SMhelper.Config
-local API, Header, Sidebar, Content = UI.API, UI.Header, UI.Sidebar, UI.Content
-local frame, contentFrame
-local pages, order = {}, {}
+-- Main settings-window coordinator. It composes independent UI components,
+-- manages lazy page registration, and exposes the public show/hide API.
+local UI = SMhelper.UI
+local Config = SMhelper.Config
+local Layout = Config.Layout
+local API = UI.API
+local Header = UI.Header
+local Sidebar = UI.Sidebar
+local Content = UI.Content
 
--- register a lazy page factory
-function UI:RegisterPage(id, spec)
-    assert(type(id) == "string" and type(spec) == "table" and type(spec.create) == "function", "Invalid page")
-    if not pages[id] then order[#order + 1] = id end
-    pages[id] = spec
-end
+local mainFrame
+local contentFrame
+local registeredPages = {}
+local pageOrder = {}
 
--- create a page on first use, then show it
-local function selectPage(id)
-    local spec = pages[id]
-    if not spec then return false end
-    if not Content:HasPage(id) then Content:RegisterPage(id, spec.create(contentFrame)) end
-    Content:ShowPage(id)
-    Sidebar:SetSelected(id)
-    return true
-end
-
--- build the complete window once
-function UI:Create()
-    if frame then return frame end
-
-    frame = API:CreatePanel(UIParent, {
+-- Create and configure the movable, resizable root frame.
+local function CreateMainFrame()
+    local frame = API:CreatePanel(UIParent, {
         width = Config.width,
         height = Config.height,
         color = Config.colors.background,
     })
+
     frame:SetPoint("CENTER")
     frame:SetFrameStrata(Config.frameStrata)
     frame:SetFrameLevel(Config.frameLevel)
@@ -42,53 +33,159 @@ function UI:Create()
     frame:SetClampedToScreen(true)
     API:CreateBorder(frame, Config.colors.border, 1)
 
-    local header = Header:Create(frame, function() UI:Hide() end)
+    return frame
+end
+
+-- Attach close and drag behavior to the header component.
+local function CreateWindowHeader(frame)
+    local header = Header:Create(frame, function()
+        UI:Hide()
+    end)
+
     header:SetPoint("TOPLEFT")
     header:SetPoint("TOPRIGHT")
     header:EnableMouse(true)
     header:RegisterForDrag("LeftButton")
-    header:SetScript("OnDragStart", function() frame:StartMoving() end)
-    header:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
+    header:SetScript("OnDragStart", function()
+        frame:StartMoving()
+    end)
+    header:SetScript("OnDragStop", function()
+        frame:StopMovingOrSizing()
+    end)
 
+    return header
+end
+
+local function CreateWindowSidebar(frame, header)
     local sidebar = Sidebar:Create(frame)
     sidebar:SetPoint("TOPLEFT", header, "BOTTOMLEFT")
     sidebar:SetPoint("BOTTOMLEFT")
+    return sidebar
+end
 
-    contentFrame = Content:Create(frame)
-    contentFrame:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", Config.padding, 0)
-    contentFrame:SetPoint("BOTTOMRIGHT", -Config.padding, Config.padding)
+local function CreateContentFrame(frame, sidebar)
+    local content = Content:Create(frame)
+    content:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", Config.padding, 0)
+    content:SetPoint("BOTTOMRIGHT", -Config.padding, Config.padding)
+    return content
+end
 
-    -- bottom-right resize handle
-    local resize = CreateFrame("Button", nil, frame)
-    resize:SetSize(20, 20)
-    resize:SetPoint("BOTTOMRIGHT", -2, 2)
-    resize:SetFrameLevel(frame:GetFrameLevel() + 10)
-    resize:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    resize:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-    resize:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-    resize:SetScript("OnMouseDown", function(_, button)
-        if button == "LeftButton" then frame:StartSizing("BOTTOMRIGHT") end
+-- Create the bottom-right grip and connect mouse gestures to frame resizing.
+local function CreateResizeHandle(frame)
+    local resizeHandle = CreateFrame("Button", nil, frame)
+
+    resizeHandle:SetSize(Layout.RESIZE_HANDLE_SIZE, Layout.RESIZE_HANDLE_SIZE)
+    resizeHandle:SetPoint(
+        "BOTTOMRIGHT",
+        Layout.RESIZE_HANDLE_X,
+        Layout.RESIZE_HANDLE_Y
+    )
+    resizeHandle:SetFrameLevel(
+        frame:GetFrameLevel() + Layout.RESIZE_FRAME_LEVEL_OFFSET
+    )
+    resizeHandle:SetNormalTexture(Config.Paths.RESIZE_NORMAL)
+    resizeHandle:SetHighlightTexture(Config.Paths.RESIZE_HIGHLIGHT)
+    resizeHandle:SetPushedTexture(Config.Paths.RESIZE_PUSHED)
+
+    resizeHandle:SetScript("OnMouseDown", function(_, mouseButton)
+        if mouseButton == "LeftButton" then
+            frame:StartSizing("BOTTOMRIGHT")
+        end
     end)
-    resize:SetScript("OnMouseUp", function() frame:StopMovingOrSizing() end)
 
-    Sidebar:SetOnSelect(selectPage)
-    for _, id in ipairs(order) do
-        Sidebar:AddButton({ id = id, text = pages[id].title or id })
+    resizeHandle:SetScript("OnMouseUp", function()
+        frame:StopMovingOrSizing()
+    end)
+
+    return resizeHandle
+end
+
+-- Lazily construct a registered page, then synchronize content and sidebar state.
+local function ShowRegisteredPage(pageId)
+    local pageSpecification = registeredPages[pageId]
+
+    if not pageSpecification then
+        return false
     end
 
-    frame:Hide()
-    selectPage(Config.defaultPage)
-    return frame
+    if not Content:HasPage(pageId) then
+        local pageFrame = pageSpecification.create(contentFrame)
+        Content:RegisterPage(pageId, pageFrame)
+    end
+
+    Content:ShowPage(pageId)
+    Sidebar:SetSelected(pageId)
+    return true
 end
 
--- open a page by its id
-function UI:ShowPage(id)
-    self:Create()
-    return selectPage(id)
+-- Build sidebar buttons in the same order pages were registered.
+local function CreateNavigationButtons()
+    Sidebar:SetOnSelect(ShowRegisteredPage)
+
+    for _, pageId in ipairs(pageOrder) do
+        local pageSpecification = registeredPages[pageId]
+        Sidebar:AddButton({
+            id = pageId,
+            text = pageSpecification.title or pageId,
+        })
+    end
 end
 
--- public window controls
-function UI:Show() self:Create():Show() end
-function UI:Hide() if frame then frame:Hide() end end
-function UI:Toggle() self:Create(); frame:SetShown(not frame:IsShown()) end
-function UI:IsShown() return frame and frame:IsShown() or false end
+-- Register a page factory without constructing its frame immediately.
+function UI:RegisterPage(pageId, pageSpecification)
+    assert(
+        type(pageId) == "string"
+        and type(pageSpecification) == "table"
+        and type(pageSpecification.create) == "function",
+        "Invalid page registration"
+    )
+
+    if not registeredPages[pageId] then
+        pageOrder[#pageOrder + 1] = pageId
+    end
+
+    registeredPages[pageId] = pageSpecification
+end
+
+-- Compose the complete settings window once and select the default page.
+function UI:CreateMainWindow()
+    if mainFrame then
+        return mainFrame
+    end
+
+    mainFrame = CreateMainFrame()
+    local header = CreateWindowHeader(mainFrame)
+    local sidebar = CreateWindowSidebar(mainFrame, header)
+    contentFrame = CreateContentFrame(mainFrame, sidebar)
+
+    CreateResizeHandle(mainFrame)
+    CreateNavigationButtons()
+
+    mainFrame:Hide()
+    ShowRegisteredPage(Config.defaultPage)
+    return mainFrame
+end
+
+function UI:ShowPage(pageId)
+    self:CreateMainWindow()
+    return ShowRegisteredPage(pageId)
+end
+
+function UI:Show()
+    self:CreateMainWindow():Show()
+end
+
+function UI:Hide()
+    if mainFrame then
+        mainFrame:Hide()
+    end
+end
+
+function UI:Toggle()
+    self:CreateMainWindow()
+    mainFrame:SetShown(not mainFrame:IsShown())
+end
+
+function UI:IsShown()
+    return mainFrame and mainFrame:IsShown() or false
+end

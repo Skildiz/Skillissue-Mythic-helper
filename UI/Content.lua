@@ -1,20 +1,21 @@
 local addonName, SMhelper = ...
 
--- page container and page switching
+-- Content host for lazily created settings pages. It owns page parenting,
+-- visibility, and active-page tracking, while navigation remains in Sidebar.
 SMhelper.UI.Content = SMhelper.UI.Content or {}
 local Content = SMhelper.UI.Content
 local host
 local pages = {}
 local activeId
 
--- create the shared page area
+-- Create the shared content frame once.
 function Content:Create(parent)
     if host then return host end
     host = CreateFrame("Frame", nil, parent)
     return host
 end
 
--- attach a page to the content area
+-- Attach and hide a newly constructed page until it is selected.
 function Content:RegisterPage(id, frame)
     assert(host, "Content:Create(parent) must be called first")
     assert(type(id) == "string" and frame, "Content:RegisterPage(id, frame) requires both arguments")
@@ -24,7 +25,7 @@ function Content:RegisterPage(id, frame)
     pages[id] = frame
 end
 
--- hide the old page and show the selected page
+-- Switch visibility from the active page to the requested page.
 function Content:ShowPage(id)
     local page = pages[id]
     if not page then return false end
@@ -34,7 +35,7 @@ function Content:ShowPage(id)
     return true
 end
 
--- check whether a page was already created
+-- Report whether a lazy page factory has already produced its frame.
 function Content:HasPage(id)
     return pages[id] ~= nil
 end

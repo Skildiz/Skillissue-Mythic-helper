@@ -1,25 +1,26 @@
 local _, SMhelper = ...
 
--- Automatic combat logging feature.
--- Starts and stops combat logging when entering or leaving
--- a selected loggable instance.
-
+-- Automatic combat logging module. It maps the current instance difficulty
+-- to a user-configurable trigger and tracks whether this addon started logging,
+-- preventing it from stopping a logging session owned by another addon.
 SMhelper.Modules = SMhelper.Modules or {}
 SMhelper.Modules.CombatLogging = SMhelper.Modules.CombatLogging or {}
 
 local CombatLogging = SMhelper.Modules.CombatLogging
+local Constants = SMhelper.Config.CombatLogging
+local Difficulty = Constants.DIFFICULTY
 
--- Ordered trigger list rendered by the Auto-Log Triggers dropdown.
+-- Ordered definitions used by both settings storage and the trigger dropdown.
 CombatLogging.Triggers = {
     { key = "mythicDungeon", text = "Mythic Dungeon" },
-    { key = "mythicplus",    text = "Mythic+ Dungeon" },
-    { key = "mythicRaid",    text = "Mythic Raid" },
-    { key = "heroicRaid",    text = "Heroic Raid" },
-    { key = "normalRaid",    text = "Normal Raid" },
-    { key = "lfrRaid",       text = "Raid Finder" },
+    { key = "mythicplus", text = "Mythic+ Dungeon" },
+    { key = "mythicRaid", text = "Mythic Raid" },
+    { key = "heroicRaid", text = "Heroic Raid" },
+    { key = "normalRaid", text = "Normal Raid" },
+    { key = "lfrRaid", text = "Raid Finder" },
 }
 
--- Fallback values used when a setting has never been changed by the user.
+-- Fallback values are read without eagerly writing every option to SavedVariables.
 CombatLogging.Defaults = {
     mythicDungeon = true,
     mythicplus = true,
@@ -30,228 +31,245 @@ CombatLogging.Defaults = {
     delaystop = false,
 }
 
-local config = {}
+local settings = {}
 local eventFrame
-local loggingStartedByUs = false
-local pendingStop
+local loggingStartedByAddon = false
+local pendingStopToken
 local activeTriggerKey
 
 local LOGGING_ENABLED_MESSAGE =
     "Log recording is enabled. Combat logs will be automatically started and stopped when entering or leaving selected instances."
 
--- Read a trigger value, falling back to its default.
-local function triggerValue(key)
-    local value = config[key]
+local function IsTriggerEnabled(triggerKey)
+    local configuredValue = settings[triggerKey]
 
-    if value == nil then
-        return CombatLogging.Defaults[key] == true
+    if configuredValue == nil then
+        return CombatLogging.Defaults[triggerKey] == true
     end
 
-    return value == true
+    return configuredValue == true
 end
 
--- Map the current instance to a trigger key.
--- Returns nil when the current instance is not supported.
-local function resolveTriggerKey()
-    local _, instanceType, difficultyID = GetInstanceInfo()
+-- Convert supported five-player difficulty IDs into configuration keys.
+local function ResolvePartyTrigger(difficultyId)
+    if difficultyId == Difficulty.MYTHIC_DUNGEON then
+        return "mythicDungeon"
+    end
 
-    if instanceType == "party" then
-        if difficultyID == 23 then
-            return "mythicDungeon"
-        end
-
-        if difficultyID == 8 then
-            return "mythicplus"
-        end
-    elseif instanceType == "raid" then
-        if difficultyID == 16 then
-            return "mythicRaid"
-        end
-
-        if difficultyID == 15 then
-            return "heroicRaid"
-        end
-
-        if difficultyID == 14 then
-            return "normalRaid"
-        end
-
-        if difficultyID == 17 or difficultyID == 7 then
-            return "lfrRaid"
-        end
+    if difficultyId == Difficulty.MYTHIC_PLUS then
+        return "mythicplus"
     end
 
     return nil
 end
 
--- Print the combat logging notification in blue.
-local function showLoggingEnabledMessage()
+-- Convert supported raid difficulty IDs into configuration keys.
+local function ResolveRaidTrigger(difficultyId)
+    if difficultyId == Difficulty.MYTHIC_RAID then
+        return "mythicRaid"
+    end
+
+    if difficultyId == Difficulty.HEROIC_RAID then
+        return "heroicRaid"
+    end
+
+    if difficultyId == Difficulty.NORMAL_RAID then
+        return "normalRaid"
+    end
+
+    if difficultyId == Difficulty.RAID_FINDER
+        or difficultyId == Difficulty.LEGACY_RAID_FINDER then
+        return "lfrRaid"
+    end
+
+    return nil
+end
+
+-- Return the trigger key for the current instance, or nil when unsupported.
+local function ResolveCurrentTrigger()
+    local _, instanceType, difficultyId = GetInstanceInfo()
+
+    if instanceType == "party" then
+        return ResolvePartyTrigger(difficultyId)
+    end
+
+    if instanceType == "raid" then
+        return ResolveRaidTrigger(difficultyId)
+    end
+
+    return nil
+end
+
+local function ShowLoggingEnabledMessage()
     DEFAULT_CHAT_FRAME:AddMessage(
         LOGGING_ENABLED_MESSAGE,
-        0.25,
-        0.65,
-        1
+        unpack(Constants.MESSAGE_COLOR)
     )
 end
 
--- Forget any scheduled delayed stop.
-local function cancelPendingStop()
-    pendingStop = nil
+local function CancelPendingStop()
+    pendingStopToken = nil
 end
 
--- Turn combat logging off only if this module turned it on.
-local function stopLogging()
-    if loggingStartedByUs and LoggingCombat() then
+-- Stop logging only when this module started the active logging session.
+local function StopAddonLogging()
+    if loggingStartedByAddon and LoggingCombat() then
         LoggingCombat(false)
     end
 
-    loggingStartedByUs = false
+    loggingStartedByAddon = false
 end
 
--- Stop combat logging after a 30-second delay.
--- This provides compatibility with Warcraft Recorder.
-local function scheduleStop()
-    -- Do not restart the timer if a delayed stop is already scheduled.
-    if pendingStop then
+-- Use a token so canceled timers cannot stop a newer logging session.
+local function ScheduleDelayedStop()
+    if pendingStopToken then
         return
     end
 
-    local token = {}
-    pendingStop = token
+    local stopToken = {}
+    pendingStopToken = stopToken
 
-    C_Timer.After(30, function()
-        if pendingStop ~= token then
+    C_Timer.After(Constants.DELAYED_STOP_SECONDS, function()
+        if pendingStopToken ~= stopToken then
             return
         end
 
-        pendingStop = nil
-        stopLogging()
+        pendingStopToken = nil
+        StopAddonLogging()
     end)
 end
 
--- Evaluate the current instance and start or stop logging accordingly.
-function CombatLogging:Recheck()
-    -- Master switch is disabled.
-    if config.enabled ~= true then
-        activeTriggerKey = nil
-        cancelPendingStop()
-        stopLogging()
-        return
+-- Start logging and notify once when entering a newly matched trigger.
+local function StartLoggingForTrigger(triggerKey)
+    CancelPendingStop()
+
+    if not LoggingCombat() then
+        LoggingCombat(true)
+        loggingStartedByAddon = true
     end
 
-    local key = resolveTriggerKey()
-    local shouldLog = key and triggerValue(key)
-
-    if shouldLog then
-        cancelPendingStop()
-
-        -- Start logging if it is not already active.
-        if not LoggingCombat() then
-            LoggingCombat(true)
-            loggingStartedByUs = true
-        end
-
-        -- Show the message only once when entering a selected instance.
-        if activeTriggerKey ~= key then
-            activeTriggerKey = key
-            showLoggingEnabledMessage()
-        end
-
-        return
+    if activeTriggerKey ~= triggerKey then
+        activeTriggerKey = triggerKey
+        ShowLoggingEnabledMessage()
     end
+end
 
-    -- The character is no longer inside a selected instance.
+-- Stop immediately or schedule the compatibility delay after leaving.
+local function StopLoggingAfterLeavingInstance()
     activeTriggerKey = nil
 
-    -- Stop only the logging session started by this module.
-    if loggingStartedByUs and LoggingCombat() then
-        if triggerValue("delaystop") then
-            scheduleStop()
-        else
-            cancelPendingStop()
-            stopLogging()
-        end
+    if not loggingStartedByAddon or not LoggingCombat() then
+        CancelPendingStop()
+        loggingStartedByAddon = false
+        return
+    end
+
+    if IsTriggerEnabled("delaystop") then
+        ScheduleDelayedStop()
     else
-        cancelPendingStop()
-        loggingStartedByUs = false
+        CancelPendingStop()
+        StopAddonLogging()
     end
 end
 
--- Load saved options and begin listening for instance changes.
-function CombatLogging:Initialize(savedState)
-    if type(savedState) == "table" then
-        config = savedState
-    else
-        config = {}
+local function DisableAutomaticLogging()
+    activeTriggerKey = nil
+    CancelPendingStop()
+    StopAddonLogging()
+end
+
+-- Create the invisible frame that funnels instance changes into one state check.
+local function CreateEventFrame()
+    local frame = CreateFrame("Frame")
+    frame:SetScript("OnEvent", function()
+        CombatLogging:RefreshLoggingState()
+    end)
+    return frame
+end
+
+local function RegisterInstanceEvents(frame)
+    frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+    frame:RegisterEvent("CHALLENGE_MODE_START")
+    frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+end
+
+-- Reconcile logging with the master switch, current instance, and trigger settings.
+function CombatLogging:RefreshLoggingState()
+    if settings.enabled ~= true then
+        DisableAutomaticLogging()
+        return
     end
+
+    local triggerKey = ResolveCurrentTrigger()
+
+    if triggerKey and IsTriggerEnabled(triggerKey) then
+        StartLoggingForTrigger(triggerKey)
+        return
+    end
+
+    StopLoggingAfterLeavingInstance()
+end
+
+-- Restore settings, register instance events once, and evaluate current state.
+function CombatLogging:Initialize(savedState)
+    settings = type(savedState) == "table" and savedState or {}
 
     SMhelperDB = SMhelperDB or {}
-    SMhelperDB.combatLogging = config
+    SMhelperDB.combatLogging = settings
 
     if not eventFrame then
-        eventFrame = CreateFrame("Frame")
-
-        eventFrame:SetScript("OnEvent", function()
-            CombatLogging:Recheck()
-        end)
+        eventFrame = CreateEventFrame()
     end
 
-    eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-    eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-    eventFrame:RegisterEvent("CHALLENGE_MODE_START")
-    eventFrame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
-
-    self:Recheck()
+    RegisterInstanceEvents(eventFrame)
+    self:RefreshLoggingState()
 end
 
--- Return the live configuration table shared with SMhelperDB.
 function CombatLogging:GetConfig()
-    return config
+    return settings
 end
 
--- Master switch helpers.
 function CombatLogging:IsEnabled()
-    return config.enabled == true
+    return settings.enabled == true
 end
 
 function CombatLogging:SetEnabled(value)
-    config.enabled = value and true or nil
-    self:Recheck()
+    settings.enabled = value and true or nil
+    self:RefreshLoggingState()
 end
 
--- Per-trigger helpers.
-function CombatLogging:GetTrigger(key)
-    return triggerValue(key)
+function CombatLogging:GetTrigger(triggerKey)
+    return IsTriggerEnabled(triggerKey)
 end
 
-function CombatLogging:SetTrigger(key, value)
-    config[key] = value and true or false
-    self:Recheck()
+function CombatLogging:SetTrigger(triggerKey, value)
+    settings[triggerKey] = value and true or false
+    self:RefreshLoggingState()
 end
 
--- Warcraft Recorder compatibility helpers.
 function CombatLogging:GetDelayStop()
-    return triggerValue("delaystop")
+    return IsTriggerEnabled("delaystop")
 end
 
 function CombatLogging:SetDelayStop(value)
-    config.delaystop = value and true or false
-    self:Recheck()
+    settings.delaystop = value and true or false
+    self:RefreshLoggingState()
 end
 
--- Return a comma-separated list of enabled triggers for the dropdown label.
+-- Build the compact label displayed by the multi-select trigger dropdown.
 function CombatLogging:GetTriggerSummary()
-    local parts = {}
+    local enabledTriggerNames = {}
 
-    for _, item in ipairs(self.Triggers) do
-        if triggerValue(item.key) then
-            parts[#parts + 1] = item.text
+    for _, trigger in ipairs(self.Triggers) do
+        if IsTriggerEnabled(trigger.key) then
+            enabledTriggerNames[#enabledTriggerNames + 1] = trigger.text
         end
     end
 
-    if #parts == 0 then
+    if #enabledTriggerNames == 0 then
         return "None"
     end
 
-    return table.concat(parts, ", ")
+    return table.concat(enabledTriggerNames, ", ")
 end

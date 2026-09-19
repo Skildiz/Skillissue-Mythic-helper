@@ -1,13 +1,13 @@
 local addonName, SMhelper = ...
 
--- Addon startup and slash commands
+-- Addon entry point. Waits for this addon to finish loading, restores saved
+-- settings, initializes each independent module, and registers slash commands.
 local Config = SMhelper.Config
 local Colors = Config.colorCodes
 
 local eventFrame = CreateFrame("Frame")
 
--- Module initialization
--- Buff BuffReminder module
+-- Initialize the buff reminder with its persisted settings.
 local function InitializeBuffReminder()
     local module =
         SMhelper.Modules
@@ -20,7 +20,7 @@ local function InitializeBuffReminder()
     module:Initialize(SMhelperDB.buffReminder)
 end
 
--- Combat logging module
+-- Initialize automatic combat logging with its persisted settings.
 local function InitializeCombatLogging()
     local module =
         SMhelper.Modules
@@ -33,7 +33,7 @@ local function InitializeCombatLogging()
     module:Initialize(SMhelperDB.combatLogging)
 end
 
--- Auto Repair module
+-- Initialize automatic repair with its persisted settings.
 local function InitializeAutoRepair()
     local module =
         SMhelper.Modules
@@ -46,8 +46,8 @@ local function InitializeAutoRepair()
     module:Initialize(SMhelperDB.autoRepair)
 end
 
--- Minimap button initialization
--- TODO: Fix minimap button (work in progress)
+-- Create the minimap entry point and connect it to the main window toggle.
+-- TODO: Replace the fixed minimap position with draggable positioning.
 local function InitializeMinimap()
     local module =
         SMhelper.UI
@@ -65,6 +65,7 @@ local function InitializeMinimap()
 end
 
 
+-- Keep startup order explicit so module dependencies remain easy to review.
 local function InitializeModules()
     InitializeBuffReminder()
     InitializeCombatLogging()
@@ -73,7 +74,7 @@ local function InitializeModules()
 end
 
 
--- Addon events
+-- ADDON_LOADED is filtered by addon name because every addon fires this event.
 eventFrame:RegisterEvent("ADDON_LOADED")
 
 eventFrame:SetScript("OnEvent", function(self, event, loadedAddon)
@@ -83,10 +84,10 @@ eventFrame:SetScript("OnEvent", function(self, event, loadedAddon)
 
     self:UnregisterEvent("ADDON_LOADED")
 
-    -- Initialize saved variables
+-- Create the account-wide SavedVariables root before modules access it.
     SMhelperDB = SMhelperDB or {}
 
-    -- Initialize every addon module
+-- Modules receive their own saved-state tables and manage their defaults.
     InitializeModules()
 
     print(
@@ -99,7 +100,7 @@ eventFrame:SetScript("OnEvent", function(self, event, loadedAddon)
 end)
 
 
--- Slash commands
+-- Both aliases open or close the same settings window.
 SLASH_SMHELPER1 = "/smhelper"
 SLASH_SMHELPER2 = "/smh"
 

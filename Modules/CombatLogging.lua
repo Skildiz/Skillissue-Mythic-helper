@@ -7,38 +7,23 @@ SMhelper.Modules = SMhelper.Modules or {}
 SMhelper.Modules.CombatLogging = SMhelper.Modules.CombatLogging or {}
 
 local CombatLogging = SMhelper.Modules.CombatLogging
-local Constants = SMhelper.Config.CombatLogging
+local Config = SMhelper.Config
+local Constants = Config.CombatLogging
 local Difficulty = Constants.DIFFICULTY
+local TriggerKeys = Constants.TRIGGER_KEYS
+local InstanceTypes = Constants.INSTANCE_TYPES
 
 -- Ordered definitions used by both settings storage and the trigger dropdown.
-CombatLogging.Triggers = {
-    { key = "mythicDungeon", text = "Mythic Dungeon" },
-    { key = "mythicplus", text = "Mythic+ Dungeon" },
-    { key = "mythicRaid", text = "Mythic Raid" },
-    { key = "heroicRaid", text = "Heroic Raid" },
-    { key = "normalRaid", text = "Normal Raid" },
-    { key = "lfrRaid", text = "Raid Finder" },
-}
+CombatLogging.Triggers = Constants.TRIGGERS
 
 -- Fallback values are read without eagerly writing every option to SavedVariables.
-CombatLogging.Defaults = {
-    mythicDungeon = true,
-    mythicplus = true,
-    mythicRaid = true,
-    heroicRaid = true,
-    normalRaid = false,
-    lfrRaid = false,
-    delaystop = false,
-}
+CombatLogging.Defaults = Constants.DEFAULTS
 
 local settings = {}
 local eventFrame
 local loggingStartedByAddon = false
 local pendingStopToken
 local activeTriggerKey
-
-local LOGGING_ENABLED_MESSAGE =
-    "Log recording is enabled. Combat logs will be automatically started and stopped when entering or leaving selected instances."
 
 local function IsTriggerEnabled(triggerKey)
     local configuredValue = settings[triggerKey]
@@ -53,11 +38,11 @@ end
 -- Convert supported five-player difficulty IDs into configuration keys.
 local function ResolvePartyTrigger(difficultyId)
     if difficultyId == Difficulty.MYTHIC_DUNGEON then
-        return "mythicDungeon"
+        return TriggerKeys.MYTHIC_DUNGEON
     end
 
     if difficultyId == Difficulty.MYTHIC_PLUS then
-        return "mythicplus"
+        return TriggerKeys.MYTHIC_PLUS
     end
 
     return nil
@@ -66,20 +51,20 @@ end
 -- Convert supported raid difficulty IDs into configuration keys.
 local function ResolveRaidTrigger(difficultyId)
     if difficultyId == Difficulty.MYTHIC_RAID then
-        return "mythicRaid"
+        return TriggerKeys.MYTHIC_RAID
     end
 
     if difficultyId == Difficulty.HEROIC_RAID then
-        return "heroicRaid"
+        return TriggerKeys.HEROIC_RAID
     end
 
     if difficultyId == Difficulty.NORMAL_RAID then
-        return "normalRaid"
+        return TriggerKeys.NORMAL_RAID
     end
 
     if difficultyId == Difficulty.RAID_FINDER
         or difficultyId == Difficulty.LEGACY_RAID_FINDER then
-        return "lfrRaid"
+        return TriggerKeys.RAID_FINDER
     end
 
     return nil
@@ -89,11 +74,11 @@ end
 local function ResolveCurrentTrigger()
     local _, instanceType, difficultyId = GetInstanceInfo()
 
-    if instanceType == "party" then
+    if instanceType == InstanceTypes.PARTY then
         return ResolvePartyTrigger(difficultyId)
     end
 
-    if instanceType == "raid" then
+    if instanceType == InstanceTypes.RAID then
         return ResolveRaidTrigger(difficultyId)
     end
 
@@ -102,7 +87,7 @@ end
 
 local function ShowLoggingEnabledMessage()
     DEFAULT_CHAT_FRAME:AddMessage(
-        LOGGING_ENABLED_MESSAGE,
+        Constants.ENABLED_MESSAGE,
         unpack(Constants.MESSAGE_COLOR)
     )
 end
@@ -164,7 +149,7 @@ local function StopLoggingAfterLeavingInstance()
         return
     end
 
-    if IsTriggerEnabled("delaystop") then
+    if IsTriggerEnabled(TriggerKeys.DELAYED_STOP) then
         ScheduleDelayedStop()
     else
         CancelPendingStop()
@@ -180,18 +165,18 @@ end
 
 -- Create the invisible frame that funnels instance changes into one state check.
 local function CreateEventFrame()
-    local frame = CreateFrame("Frame")
-    frame:SetScript("OnEvent", function()
+    local frame = CreateFrame(Config.UI.FrameTypes.FRAME)
+    frame:SetScript(Config.UI.Scripts.EVENT, function()
         CombatLogging:RefreshLoggingState()
     end)
     return frame
 end
 
 local function RegisterInstanceEvents(frame)
-    frame:RegisterEvent("PLAYER_ENTERING_WORLD")
-    frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-    frame:RegisterEvent("CHALLENGE_MODE_START")
-    frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+    frame:RegisterEvent(Config.Events.PLAYER_ENTERING_WORLD)
+    frame:RegisterEvent(Config.Events.ZONE_CHANGED_NEW_AREA)
+    frame:RegisterEvent(Config.Events.CHALLENGE_MODE_START)
+    frame:RegisterEvent(Config.Events.CHALLENGE_MODE_COMPLETED)
 end
 
 -- Reconcile logging with the master switch, current instance, and trigger settings.
@@ -249,7 +234,7 @@ function CombatLogging:SetTrigger(triggerKey, value)
 end
 
 function CombatLogging:GetDelayStop()
-    return IsTriggerEnabled("delaystop")
+    return IsTriggerEnabled(TriggerKeys.DELAYED_STOP)
 end
 
 function CombatLogging:SetDelayStop(value)
@@ -263,13 +248,15 @@ function CombatLogging:GetTriggerSummary()
 
     for _, trigger in ipairs(self.Triggers) do
         if IsTriggerEnabled(trigger.key) then
-            enabledTriggerNames[#enabledTriggerNames + 1] = trigger.text
+        enabledTriggerNames[
+            #enabledTriggerNames + Config.Collections.NEXT_INDEX_OFFSET
+        ] = trigger.text
         end
     end
 
-    if #enabledTriggerNames == 0 then
-        return "None"
+    if #enabledTriggerNames == Config.Collections.EMPTY_COUNT then
+        return Constants.EMPTY_SUMMARY
     end
 
-    return table.concat(enabledTriggerNames, ", ")
+    return table.concat(enabledTriggerNames, Constants.SUMMARY_SEPARATOR)
 end

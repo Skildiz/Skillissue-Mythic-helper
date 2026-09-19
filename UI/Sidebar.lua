@@ -5,6 +5,7 @@ local _, SMhelper = ...
 local Widgets = SMhelper.UI.Widgets
 local Config = SMhelper.Config
 local Layout = Config.Layout
+local Anchors = Config.UI.AnchorPoints
 
 SMhelper.UI.Sidebar = SMhelper.UI.Sidebar or {}
 local Sidebar = SMhelper.UI.Sidebar
@@ -15,7 +16,11 @@ local navigationButtons = {}
 
 -- Calculate vertical placement from padding, index, and the configured row step.
 local function GetButtonYPosition(buttonIndex)
-    return -Config.padding - ((buttonIndex - 1) * Layout.SIDEBAR_BUTTON_STEP)
+    return -Config.padding
+        - (
+            (buttonIndex - Config.Collections.FIRST_INDEX)
+            * Layout.Sidebar.Button.STEP
+        )
 end
 
 function Sidebar:Create(parent)
@@ -44,23 +49,22 @@ function Sidebar:AddButton(options)
             end
         end,
         {
-            height = Layout.SIDEBAR_BUTTON_HEIGHT,
-            justifyH = "LEFT",
+            height = Layout.Sidebar.Button.HEIGHT,
+            justifyH = Config.UI.HorizontalAlignment.LEFT,
             selectedColor = Config.colors.accent,
-            glowColor = {
-                Config.colors.accent[1],
-                Config.colors.accent[2],
-                Config.colors.accent[3],
-                0.6,
-            },
+            glowColor = Config.colors.sidebarButtonGlow,
         }
     )
 
-    local y_pos = GetButtonYPosition(#navigationButtons + 1)
-    button:SetPoint("TOPLEFT", Config.padding, y_pos)
-    button:SetPoint("TOPRIGHT", -Config.padding, y_pos)
+    local y_pos = GetButtonYPosition(
+        #navigationButtons + Config.Collections.NEXT_INDEX_OFFSET
+    )
+    button:SetPoint(Anchors.TOP_LEFT, Config.padding, y_pos)
+    button:SetPoint(Anchors.TOP_RIGHT, -Config.padding, y_pos)
 
-    navigationButtons[#navigationButtons + 1] = {
+    navigationButtons[
+        #navigationButtons + Config.Collections.NEXT_INDEX_OFFSET
+    ] = {
         id = options.id,
         button = button,
     }

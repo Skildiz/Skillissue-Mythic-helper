@@ -9,11 +9,21 @@ SMhelper.UI.API = SMhelper.UI.API or {}
 local API = SMhelper.UI.API
 local Config = SMhelper.Config
 local Layout = Config.Layout
+local UIConfig = Config.UI
+local Anchors = UIConfig.AnchorPoints
+local Layers = UIConfig.DrawLayers
+local Scripts = UIConfig.Scripts
+local ZERO_OFFSET = Layout.Anchor.ZERO_OFFSET
+local ColorComponents = Config.ColorComponents
 
 -- Convert an RGBA table into the four values expected by WoW UI methods.
 local function GetColorComponents(value, fallback)
-    local selectedColor = value or fallback or Config.colors.white
-    return selectedColor[1], selectedColor[2], selectedColor[3], selectedColor[4] or 1
+    local selectedColor = value or fallback or Config.colors.defaultTexture
+    return
+        selectedColor[ColorComponents.RED],
+        selectedColor[ColorComponents.GREEN],
+        selectedColor[ColorComponents.BLUE],
+        selectedColor[ColorComponents.ALPHA] or Config.Opacity.OPAQUE
 end
 
 -- Apply only dimensions supplied by the caller, allowing anchors to size frames.
@@ -29,13 +39,18 @@ end
 
 -- Create the additive glow shown while a button is selected.
 local function CreateButtonGlow(button, options)
-    local glow = button:CreateTexture(nil, "BACKGROUND", nil, -8)
-    local offset = Layout.BUTTON_GLOW_OFFSET
+    local glow = button:CreateTexture(
+        nil,
+        Layers.BACKGROUND,
+        nil,
+        Layout.Texture.Button.GLOW_SUB_LEVEL
+    )
+    local offset = Layout.Button.GLOW_OFFSET
 
-    glow:SetPoint("TOPLEFT", -offset, offset)
-    glow:SetPoint("BOTTOMRIGHT", offset, -offset)
+    glow:SetPoint(Anchors.TOP_LEFT, -offset, offset)
+    glow:SetPoint(Anchors.BOTTOM_RIGHT, offset, -offset)
     glow:SetColorTexture(GetColorComponents(options.glowColor, Config.colors.selectedGlow))
-    glow:SetBlendMode("ADD")
+    glow:SetBlendMode(UIConfig.BlendModes.ADDITIVE)
     glow:Hide()
 
     button.Glow = glow
@@ -43,21 +58,26 @@ local function CreateButtonGlow(button, options)
 end
 
 local function CreateButtonBackground(button)
-    local background = button:CreateTexture(nil, "BACKGROUND", nil, -7)
+    local background = button:CreateTexture(
+        nil,
+        Layers.BACKGROUND,
+        nil,
+        Layout.Texture.Button.BACKGROUND_SUB_LEVEL
+    )
     background:SetAllPoints()
     button.NormalTexture = background
     return background
 end
 
 local function CreateButtonLabel(button, options)
-    local textInset = options.textInset or Layout.BUTTON_TEXT_INSET
+    local textInset = options.textInset or Layout.Button.TEXT_INSET
     local label = API:CreateLabel(button, options.text, {
         color = options.textColor,
-        justifyH = options.justifyH or "CENTER",
+        justifyH = options.justifyH or UIConfig.HorizontalAlignment.CENTER,
     })
 
-    label:SetPoint("LEFT", textInset, 0)
-    label:SetPoint("RIGHT", -textInset, 0)
+    label:SetPoint(Anchors.LEFT, textInset, ZERO_OFFSET)
+    label:SetPoint(Anchors.RIGHT, -textInset, ZERO_OFFSET)
     button.Label = label
     return label
 end
@@ -66,10 +86,15 @@ end
 function API:CreatePanel(parent, options)
     options = options or {}
 
-    local frame = CreateFrame(options.frameType or "Frame", nil, parent, options.template)
+    local frame = CreateFrame(
+        options.frameType or UIConfig.FrameTypes.FRAME,
+        nil,
+        parent,
+        options.template
+    )
     ApplyOptionalFrameSize(frame, options)
 
-    frame.Background = frame:CreateTexture(nil, "BACKGROUND")
+    frame.Background = frame:CreateTexture(nil, Layers.BACKGROUND)
     frame.Background:SetAllPoints()
     frame.Background:SetColorTexture(GetColorComponents(options.color, Config.colors.defaultPanel))
 
@@ -78,12 +103,17 @@ end
 
 -- Add a BackdropTemplate border that follows all edges of its parent.
 function API:CreateBorder(parent, borderColor, thickness)
-    local border = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    local border = CreateFrame(
+        UIConfig.FrameTypes.FRAME,
+        nil,
+        parent,
+        UIConfig.Templates.BACKDROP
+    )
 
     border:SetAllPoints()
     border:SetBackdrop({
-        edgeFile = Config.Paths.BORDER_TEXTURE,
-        edgeSize = thickness or 1,
+        edgeFile = Config.Paths.Interface.Buttons.BORDER,
+        edgeSize = thickness or Layout.Border.DEFAULT_THICKNESS,
     })
     border:SetBackdropBorderColor(GetColorComponents(borderColor, Config.colors.defaultBorder))
 
@@ -95,15 +125,15 @@ function API:CreateLabel(parent, text, options)
     options = options or {}
 
     local label = parent:CreateFontString(
-        nil,
-        options.layer or "OVERLAY",
-        options.template or "GameFontNormal"
+        options.name,
+        options.layer or Layers.OVERLAY,
+        options.template or UIConfig.Templates.FONT
     )
 
     label:SetText(text or "")
     label:SetTextColor(GetColorComponents(options.color))
-    label:SetJustifyH(options.justifyH or "LEFT")
-    label:SetJustifyV(options.justifyV or "MIDDLE")
+    label:SetJustifyH(options.justifyH or UIConfig.HorizontalAlignment.LEFT)
+    label:SetJustifyV(options.justifyV or UIConfig.VerticalAlignment.MIDDLE)
 
     if options.fontSize then
         local font, _, flags = label:GetFont()
@@ -117,10 +147,10 @@ end
 function API:CreateButton(parent, options)
     options = options or {}
 
-    local button = CreateFrame("Button", nil, parent)
+    local button = CreateFrame(UIConfig.FrameTypes.BUTTON, nil, parent)
     button:SetSize(
-        options.width or Layout.BUTTON_WIDTH,
-        options.height or Layout.BUTTON_HEIGHT
+        options.width or Layout.Button.WIDTH,
+        options.height or Layout.Button.HEIGHT
     )
 
     local glow = CreateButtonGlow(button, options)
@@ -148,18 +178,18 @@ function API:CreateButton(parent, options)
         RefreshAppearance()
     end
 
-    button:SetScript("OnEnter", function()
+    button:SetScript(Scripts.ENTER, function()
         isHovered = true
         RefreshAppearance()
     end)
 
-    button:SetScript("OnLeave", function()
+    button:SetScript(Scripts.LEAVE, function()
         isHovered = false
         RefreshAppearance()
     end)
 
     if options.onClick then
-        button:SetScript("OnClick", options.onClick)
+        button:SetScript(Scripts.CLICK, options.onClick)
     end
 
     RefreshAppearance()

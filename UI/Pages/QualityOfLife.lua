@@ -6,37 +6,66 @@ local API = SMhelper.UI.API
 local Widgets = SMhelper.UI.Widgets
 local Config = SMhelper.Config
 local Layout = Config.Layout
+local PageConfig = Config.Pages.QualityOfLife
+local Anchors = Config.UI.AnchorPoints
+local ZERO_OFFSET = Layout.Anchor.ZERO_OFFSET
 
 local function CreatePageTitle(page)
-    local title = API:CreateLabel(page, "Quality of Life", {
+    local title = API:CreateLabel(page, PageConfig.TITLE, {
         color = Config.colors.text,
-        fontSize = Layout.PAGE_TITLE_FONT_SIZE,
+        fontSize = Layout.Page.Title.FONT_SIZE,
     })
 
-    title:SetPoint("TOPLEFT", Layout.PAGE_TITLE_X, Layout.PAGE_TITLE_Y)
+    title:SetPoint(
+        Anchors.TOP_LEFT,
+        Layout.Page.Title.X,
+        Layout.Page.Title.Y
+    )
     return title
 end
 
 -- Create the anchored region that contains all vertically stacked controls.
 local function CreatePageBody(page, title)
-    local body = CreateFrame("Frame", nil, page)
+    local body = CreateFrame(
+        Config.UI.FrameTypes.FRAME,
+        PageConfig.Frame.Body.NAME,
+        page
+    )
 
-    body:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, Layout.PAGE_BODY_TOP_OFFSET)
-    body:SetPoint("TOPRIGHT", page, "TOPRIGHT", Layout.PAGE_BODY_RIGHT_MARGIN, 0)
-    body:SetPoint("BOTTOM", page, "BOTTOM")
+    body:SetPoint(
+        Anchors.TOP_LEFT,
+        title,
+        Anchors.BOTTOM_LEFT,
+        Layout.Page.Body.LEFT_X,
+        Layout.Page.Body.TOP_OFFSET
+    )
+    body:SetPoint(
+        Anchors.TOP_RIGHT,
+        page,
+        Anchors.TOP_RIGHT,
+        Layout.Page.Body.RIGHT_MARGIN,
+        Layout.Page.Body.RIGHT_Y
+    )
+    body:SetPoint(Anchors.BOTTOM, page, Anchors.BOTTOM)
 
     return body
 end
 
 -- Bind the trigger dropdown directly to the combat logging module API.
 local function CreateTriggerDropdown(region, combatLogging)
-    local triggerLabel = API:CreateLabel(region, "Auto-Log Triggers", {
+    local triggerLabel = API:CreateLabel(region, PageConfig.Controls.TRIGGERS, {
         color = Config.colors.text,
     })
-    triggerLabel:SetPoint("LEFT", region, "LEFT", 0, 0)
+    triggerLabel:SetPoint(
+        Anchors.LEFT,
+        region,
+        Anchors.LEFT,
+        ZERO_OFFSET,
+        ZERO_OFFSET
+    )
 
     local dropdown = Widgets:CreateCheckboxDropdown(region, {
-        width = Layout.DROPDOWN_WIDTH,
+        width = Layout.Dropdown.WIDTH,
         items = combatLogging.Triggers,
         getValue = function(triggerKey)
             return combatLogging:GetTrigger(triggerKey)
@@ -48,7 +77,13 @@ local function CreateTriggerDropdown(region, combatLogging)
             return combatLogging:GetTriggerSummary()
         end,
     })
-    dropdown:SetPoint("RIGHT", region, "RIGHT", Layout.ROW_TOGGLE_RIGHT_MARGIN, 0)
+    dropdown:SetPoint(
+        Anchors.RIGHT,
+        region,
+        Anchors.RIGHT,
+        Layout.Row.TOGGLE_RIGHT_MARGIN,
+        ZERO_OFFSET
+    )
 
     return triggerLabel, dropdown
 end
@@ -57,16 +92,16 @@ end
 local function CreateCombatLoggingControls(body, combatLogging, y_pos)
     local _, headerHeight = Widgets:CreateSectionHeader(
         body,
-        "AUTO COMBAT LOGGING",
+        PageConfig.Sections.COMBAT_LOGGING,
         y_pos
     )
     y_pos = y_pos - headerHeight
 
     local primaryRow = Widgets:CreateTwoColumnRow(body, y_pos)
-    y_pos = y_pos - Layout.ROW_HEIGHT
+    y_pos = y_pos - Layout.Row.HEIGHT
 
     local compatibilityRow = Widgets:CreateTwoColumnRow(body, y_pos)
-    y_pos = y_pos - Layout.ROW_HEIGHT
+    y_pos = y_pos - Layout.Row.HEIGHT
 
     local triggerLabel, triggerDropdown = CreateTriggerDropdown(
         primaryRow.Right,
@@ -75,13 +110,13 @@ local function CreateCombatLoggingControls(body, combatLogging, y_pos)
 
     Widgets:CreateRowToggle(
         compatibilityRow.Left,
-        "Warcraft Recorder Compatibility",
+        PageConfig.Controls.RECORDER_COMPATIBILITY,
         combatLogging:GetDelayStop(),
         function(value)
             combatLogging:SetDelayStop(value)
         end,
         string.format(
-            "Delays stopping combat logging by %d seconds after leaving an instance. Recommended for Warcraft Recorder compatibility.",
+            PageConfig.Tooltips.RECORDER_COMPATIBILITY,
             Config.CombatLogging.DELAYED_STOP_SECONDS
         )
     )
@@ -90,19 +125,21 @@ local function CreateCombatLoggingControls(body, combatLogging, y_pos)
     local function RefreshDependentControls()
         local isEnabled = combatLogging:IsEnabled()
         triggerDropdown:SetEnabled(isEnabled)
-        triggerLabel:SetAlpha(isEnabled and 1 or 0.3)
+        triggerLabel:SetAlpha(
+            isEnabled and Config.Opacity.ENABLED or Config.Opacity.DISABLED
+        )
         compatibilityRow:SetShown(isEnabled)
     end
 
     Widgets:CreateRowToggle(
         primaryRow.Left,
-        "Enable Auto Logging",
+        PageConfig.Controls.ENABLE_AUTO_LOGGING,
         combatLogging:IsEnabled(),
         function(value)
             combatLogging:SetEnabled(value)
             RefreshDependentControls()
         end,
-        "Automatically starts and stops combat logging when entering or leaving a loggable instance."
+        PageConfig.Tooltips.AUTO_LOGGING
     )
 
     triggerDropdown:Refresh()
@@ -114,25 +151,33 @@ end
 local function CreateAutoRepairControls(body, autoRepair, y_pos)
     y_pos = y_pos - Config.padding
 
-    local _, headerHeight = Widgets:CreateSectionHeader(body, "GENERAL", y_pos)
+    local _, headerHeight = Widgets:CreateSectionHeader(
+        body,
+        PageConfig.Sections.GENERAL,
+        y_pos
+    )
     y_pos = y_pos - headerHeight
 
     local repairRow = Widgets:CreateTwoColumnRow(body, y_pos)
 
     Widgets:CreateRowToggle(
         repairRow.Left,
-        "Enable Auto Repair",
+        PageConfig.Controls.ENABLE_AUTO_REPAIR,
         autoRepair:IsEnabled(),
         function(value)
             autoRepair:SetEnabled(value)
         end,
-        "Automatically repairs damaged equipment when opening a repair merchant. Guild repair funds are used when available."
+        PageConfig.Tooltips.AUTO_REPAIR
     )
 end
 
 -- Lazily create the complete page using whichever feature modules are available.
 local function CreateQualityOfLifePage(parent)
-    local page = CreateFrame("Frame", nil, parent)
+    local page = CreateFrame(
+        Config.UI.FrameTypes.FRAME,
+        PageConfig.Frame.NAME,
+        parent
+    )
     local title = CreatePageTitle(page)
     local combatLogging = SMhelper.Modules and SMhelper.Modules.CombatLogging
     local autoRepair = SMhelper.Modules and SMhelper.Modules.AutoRepair
@@ -142,7 +187,7 @@ local function CreateQualityOfLifePage(parent)
     end
 
     local body = CreatePageBody(page, title)
-    local y_pos = 0
+    local y_pos = ZERO_OFFSET
     y_pos = CreateCombatLoggingControls(body, combatLogging, y_pos)
 
     if autoRepair then
@@ -152,7 +197,7 @@ local function CreateQualityOfLifePage(parent)
     return page
 end
 
-SMhelper.UI:RegisterPage("qualityOfLife", {
-    title = "Quality of Life",
+SMhelper.UI:RegisterPage(PageConfig.NAME, {
+    title = PageConfig.TITLE,
     create = CreateQualityOfLifePage,
 })

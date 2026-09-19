@@ -4,8 +4,13 @@ local addonName, SMhelper = ...
 -- settings, initializes each independent module, and registers slash commands.
 local Config = SMhelper.Config
 local Colors = Config.colorCodes
+local ADDON_LOADED_EVENT = Config.Events.ADDON_LOADED
 
-local eventFrame = CreateFrame("Frame")
+-- Both aliases open or close the same settings window.
+SLASH_SMHELPER1 = Config.SlashCommands.PRIMARY
+SLASH_SMHELPER2 = Config.SlashCommands.SECONDARY
+
+local eventFrame = CreateFrame(Config.UI.FrameTypes.FRAME)
 
 -- Initialize the buff reminder with its persisted settings.
 local function InitializeBuffReminder()
@@ -75,35 +80,33 @@ end
 
 
 -- ADDON_LOADED is filtered by addon name because every addon fires this event.
-eventFrame:RegisterEvent("ADDON_LOADED")
+eventFrame:RegisterEvent(ADDON_LOADED_EVENT)
 
-eventFrame:SetScript("OnEvent", function(self, event, loadedAddon)
-    if event ~= "ADDON_LOADED" or loadedAddon ~= addonName then
+eventFrame:SetScript(Config.UI.Scripts.EVENT, function(self, event, loadedAddon)
+    if event ~= ADDON_LOADED_EVENT or loadedAddon ~= addonName then
         return
     end
 
-    self:UnregisterEvent("ADDON_LOADED")
+    self:UnregisterEvent(ADDON_LOADED_EVENT)
 
--- Create the account-wide SavedVariables root before modules access it.
+    -- Create the account-wide SavedVariables root before modules access it.
     SMhelperDB = SMhelperDB or {}
 
--- Modules receive their own saved-state tables and manage their defaults.
+    -- Modules receive their own saved-state tables and manage their defaults.
     InitializeModules()
 
     print(
         Colors.accent
         .. Config.title
-        .. " successfully loaded! "
-        .. "Type /smhelper or /smh to open the settings window."
+        .. Config.Messages.LOADED
+        .. Config.Messages.COMMAND_PREFIX
+        .. SLASH_SMHELPER1
+        .. Config.Messages.COMMAND_SEPARATOR
+        .. SLASH_SMHELPER2
+        .. Config.Messages.COMMAND_SUFFIX
         .. Colors.reset
     )
 end)
-
-
--- Both aliases open or close the same settings window.
-SLASH_SMHELPER1 = "/smhelper"
-SLASH_SMHELPER2 = "/smh"
-
 SlashCmdList.SMHELPER = function()
     if SMhelper.UI and SMhelper.UI.Toggle then
         SMhelper.UI:Toggle()
@@ -113,7 +116,7 @@ SlashCmdList.SMHELPER = function()
     print(
         Colors.error
         .. Config.title
-        .. ": UI module is unavailable."
+        .. Config.Messages.UI_UNAVAILABLE
         .. Colors.reset
     )
 end

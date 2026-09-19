@@ -12,7 +12,7 @@ local Layout = Config.Layout
 
 -- Convert an RGBA table into the four values expected by WoW UI methods.
 local function GetColorComponents(value, fallback)
-    local selectedColor = value or fallback or Config.colors.white
+    local selectedColor = value or fallback or Config.colors.defaultTexture
     return selectedColor[1], selectedColor[2], selectedColor[3], selectedColor[4] or 1
 end
 
@@ -30,7 +30,7 @@ end
 -- Create the additive glow shown while a button is selected.
 local function CreateButtonGlow(button, options)
     local glow = button:CreateTexture(nil, "BACKGROUND", nil, -8)
-    local offset = Layout.BUTTON_GLOW_OFFSET
+    local offset = Layout.Button.GLOW_OFFSET
 
     glow:SetPoint("TOPLEFT", -offset, offset)
     glow:SetPoint("BOTTOMRIGHT", offset, -offset)
@@ -50,7 +50,7 @@ local function CreateButtonBackground(button)
 end
 
 local function CreateButtonLabel(button, options)
-    local textInset = options.textInset or Layout.BUTTON_TEXT_INSET
+    local textInset = options.textInset or Layout.Button.TEXT_INSET
     local label = API:CreateLabel(button, options.text, {
         color = options.textColor,
         justifyH = options.justifyH or "CENTER",
@@ -82,7 +82,7 @@ function API:CreateBorder(parent, borderColor, thickness)
 
     border:SetAllPoints()
     border:SetBackdrop({
-        edgeFile = Config.Paths.BORDER_TEXTURE,
+        edgeFile = Config.Paths.Interface.Buttons.BORDER,
         edgeSize = thickness or 1,
     })
     border:SetBackdropBorderColor(GetColorComponents(borderColor, Config.colors.defaultBorder))
@@ -95,7 +95,7 @@ function API:CreateLabel(parent, text, options)
     options = options or {}
 
     local label = parent:CreateFontString(
-        nil,
+        options.name,
         options.layer or "OVERLAY",
         options.template or "GameFontNormal"
     )
@@ -119,8 +119,8 @@ function API:CreateButton(parent, options)
 
     local button = CreateFrame("Button", nil, parent)
     button:SetSize(
-        options.width or Layout.BUTTON_WIDTH,
-        options.height or Layout.BUTTON_HEIGHT
+        options.width or Layout.Button.WIDTH,
+        options.height or Layout.Button.HEIGHT
     )
 
     local glow = CreateButtonGlow(button, options)

@@ -1,45 +1,76 @@
 local _, SMhelper = ...
 
--- sidebar navigation buttons
-local Widgets, Config = SMhelper.UI.Widgets, SMhelper.Config
+-- Sidebar navigation component. It owns button ordering and selected-state
+-- rendering while delegating page changes through an injected callback.
+local Widgets = SMhelper.UI.Widgets
+local Config = SMhelper.Config
+local Layout = Config.Layout
+
 SMhelper.UI.Sidebar = SMhelper.UI.Sidebar or {}
 local Sidebar = SMhelper.UI.Sidebar
-local frame, onSelect
-local buttons = {}
 
--- create the sidebar panel
+local sidebarFrame
+local onPageSelected
+local navigationButtons = {}
+
+-- Calculate vertical placement from padding, index, and the configured row step.
+local function GetButtonYPosition(buttonIndex)
+    return -Config.padding - ((buttonIndex - 1) * Layout.SIDEBAR_BUTTON_STEP)
+end
+
 function Sidebar:Create(parent)
-    if not frame then
-        frame = SMhelper.UI.API:CreatePanel(parent, { width = Config.sidebarWidth, color = Config.colors.panel })
+    if not sidebarFrame then
+        sidebarFrame = SMhelper.UI.API:CreatePanel(parent, {
+            width = Config.sidebarWidth,
+            color = Config.colors.panel,
+        })
     end
-    return frame
+
+    return sidebarFrame
 end
 
--- set the page selection callback
 function Sidebar:SetOnSelect(callback)
-    onSelect = callback
+    onPageSelected = callback
 end
 
--- add one navigation button
+-- Add one navigation button and preserve its page ID for selection updates.
 function Sidebar:AddButton(options)
-    local button = Widgets:CreateButton(frame, options.text or options.id, function()
-        if onSelect then onSelect(options.id) end
-    end, {
-        height = 38,
-        justifyH = "LEFT",
-        selectedColor = Config.colors.accent,
-        glowColor = { Config.colors.accent[1], Config.colors.accent[2], Config.colors.accent[3], 0.6 },
-    })
-    local y = -Config.padding - (#buttons * 44)
-    button:SetPoint("TOPLEFT", Config.padding, y)
-    button:SetPoint("TOPRIGHT", -Config.padding, y)
-    buttons[#buttons + 1] = { id = options.id, button = button }
+    local button = Widgets:CreateButton(
+        sidebarFrame,
+        options.text or options.id,
+        function()
+            if onPageSelected then
+                onPageSelected(options.id)
+            end
+        end,
+        {
+            height = Layout.SIDEBAR_BUTTON_HEIGHT,
+            justifyH = "LEFT",
+            selectedColor = Config.colors.accent,
+            glowColor = {
+                Config.colors.accent[1],
+                Config.colors.accent[2],
+                Config.colors.accent[3],
+                0.6,
+            },
+        }
+    )
+
+    local y_pos = GetButtonYPosition(#navigationButtons + 1)
+    button:SetPoint("TOPLEFT", Config.padding, y_pos)
+    button:SetPoint("TOPRIGHT", -Config.padding, y_pos)
+
+    navigationButtons[#navigationButtons + 1] = {
+        id = options.id,
+        button = button,
+    }
+
     return button
 end
 
--- highlight the active button
-function Sidebar:SetSelected(id)
-    for _, item in ipairs(buttons) do
-        item.button:SetSelected(item.id == id)
+-- Highlight only the button associated with the active page.
+function Sidebar:SetSelected(selectedPageId)
+    for _, item in ipairs(navigationButtons) do
+        item.button:SetSelected(item.id == selectedPageId)
     end
 end

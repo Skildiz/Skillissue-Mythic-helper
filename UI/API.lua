@@ -1,99 +1,167 @@
 local _, SMhelper = ...
 
--- low-level UI helpers
+-- Low-level UI factory helpers. These functions centralize frame construction
+-- and visual behavior so higher-level components do not repeat texture, font,
+-- color, hover, and selection setup.
 SMhelper.UI = SMhelper.UI or {}
 SMhelper.UI.API = SMhelper.UI.API or {}
-local API = SMhelper.UI.API
 
--- unpack a color table
-local function color(value, fallback)
-    value = value or fallback or { 1, 1, 1, 1 }
-    return value[1], value[2], value[3], value[4] or 1
+local API = SMhelper.UI.API
+local Config = SMhelper.Config
+local Layout = Config.Layout
+
+-- Convert an RGBA table into the four values expected by WoW UI methods.
+local function GetColorComponents(value, fallback)
+    local selectedColor = value or fallback or Config.colors.white
+    return selectedColor[1], selectedColor[2], selectedColor[3], selectedColor[4] or 1
 end
 
--- create a colored frame
+-- Apply only dimensions supplied by the caller, allowing anchors to size frames.
+local function ApplyOptionalFrameSize(frame, options)
+    if options.width then
+        frame:SetWidth(options.width)
+    end
+
+    if options.height then
+        frame:SetHeight(options.height)
+    end
+end
+
+-- Create the additive glow shown while a button is selected.
+local function CreateButtonGlow(button, options)
+    local glow = button:CreateTexture(nil, "BACKGROUND", nil, -8)
+    local offset = Layout.BUTTON_GLOW_OFFSET
+
+    glow:SetPoint("TOPLEFT", -offset, offset)
+    glow:SetPoint("BOTTOMRIGHT", offset, -offset)
+    glow:SetColorTexture(GetColorComponents(options.glowColor, Config.colors.selectedGlow))
+    glow:SetBlendMode("ADD")
+    glow:Hide()
+
+    button.Glow = glow
+    return glow
+end
+
+local function CreateButtonBackground(button)
+    local background = button:CreateTexture(nil, "BACKGROUND", nil, -7)
+    background:SetAllPoints()
+    button.NormalTexture = background
+    return background
+end
+
+local function CreateButtonLabel(button, options)
+    local textInset = options.textInset or Layout.BUTTON_TEXT_INSET
+    local label = API:CreateLabel(button, options.text, {
+        color = options.textColor,
+        justifyH = options.justifyH or "CENTER",
+    })
+
+    label:SetPoint("LEFT", textInset, 0)
+    label:SetPoint("RIGHT", -textInset, 0)
+    button.Label = label
+    return label
+end
+
+-- Create a frame with a full-size solid-color background texture.
 function API:CreatePanel(parent, options)
     options = options or {}
+
     local frame = CreateFrame(options.frameType or "Frame", nil, parent, options.template)
-    if options.width then frame:SetWidth(options.width) end
-    if options.height then frame:SetHeight(options.height) end
+    ApplyOptionalFrameSize(frame, options)
 
     frame.Background = frame:CreateTexture(nil, "BACKGROUND")
     frame.Background:SetAllPoints()
-    frame.Background:SetColorTexture(color(options.color, { 0.08, 0.08, 0.08, 1 }))
+    frame.Background:SetColorTexture(GetColorComponents(options.color, Config.colors.defaultPanel))
+
     return frame
 end
 
--- add a simple frame border
+-- Add a BackdropTemplate border that follows all edges of its parent.
 function API:CreateBorder(parent, borderColor, thickness)
     local border = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+
     border:SetAllPoints()
-    border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = thickness or 1 })
-    border:SetBackdropBorderColor(color(borderColor, { 0.3, 0.3, 0.3, 1 }))
+    border:SetBackdrop({
+        edgeFile = Config.Paths.BORDER_TEXTURE,
+        edgeSize = thickness or 1,
+    })
+    border:SetBackdropBorderColor(GetColorComponents(borderColor, Config.colors.defaultBorder))
+
     return border
 end
 
--- create a text label
+-- Create a consistently styled font string with optional size and alignment.
 function API:CreateLabel(parent, text, options)
     options = options or {}
-    local label = parent:CreateFontString(nil, options.layer or "OVERLAY", options.template or "GameFontNormal")
+
+    local label = parent:CreateFontString(
+        nil,
+        options.layer or "OVERLAY",
+        options.template or "GameFontNormal"
+    )
+
     label:SetText(text or "")
-    label:SetTextColor(color(options.color))
+    label:SetTextColor(GetColorComponents(options.color))
     label:SetJustifyH(options.justifyH or "LEFT")
     label:SetJustifyV(options.justifyV or "MIDDLE")
+
     if options.fontSize then
         local font, _, flags = label:GetFont()
         label:SetFont(font, options.fontSize, flags)
     end
+
     return label
 end
 
--- create a button with hover and active states
+-- Create a reusable button with normal, hover, and selected visual states.
 function API:CreateButton(parent, options)
     options = options or {}
+
     local button = CreateFrame("Button", nil, parent)
-    button:SetSize(options.width or 120, options.height or 32)
+    button:SetSize(
+        options.width or Layout.BUTTON_WIDTH,
+        options.height or Layout.BUTTON_HEIGHT
+    )
 
-    local glow = button:CreateTexture(nil, "BACKGROUND", nil, -8)
-    glow:SetPoint("TOPLEFT", -4, 4)
-    glow:SetPoint("BOTTOMRIGHT", 4, -4)
-    glow:SetColorTexture(color(options.glowColor, { 0.20, 0.58, 1.00, 0.55 }))
-    glow:SetBlendMode("ADD")
-    glow:Hide()
-    button.Glow = glow
+    local glow = CreateButtonGlow(button, options)
+    local background = CreateButtonBackground(button)
+    CreateButtonLabel(button, options)
 
-    local background = button:CreateTexture(nil, "BACKGROUND", nil, -7)
-    background:SetAllPoints()
-    button.NormalTexture = background
+    local isHovered = false
+    local isSelected = false
 
-    local label = self:CreateLabel(button, options.text, {
-        color = options.textColor,
-        justifyH = options.justifyH or "CENTER",
-    })
-    label:SetPoint("LEFT", options.textInset or 10, 0)
-    label:SetPoint("RIGHT", -(options.textInset or 10), 0)
-    button.Label = label
+    local function RefreshAppearance()
+        local fillColor = options.color or Config.colors.defaultButton
 
-    local hovered, selected = false, false
-    -- refresh the button appearance
-    local function render()
-        local fill = selected and options.selectedColor
-            or (hovered and options.hoverColor)
-            or options.color
-            or { 0.12, 0.12, 0.12, 1 }
-        background:SetColorTexture(color(fill))
-        glow:SetShown(selected)
+        if isSelected and options.selectedColor then
+            fillColor = options.selectedColor
+        elseif isHovered and options.hoverColor then
+            fillColor = options.hoverColor
+        end
+
+        background:SetColorTexture(GetColorComponents(fillColor))
+        glow:SetShown(isSelected)
     end
 
-    -- mark the button as active
     function button:SetSelected(value)
-        selected = not not value
-        render()
+        isSelected = value == true
+        RefreshAppearance()
     end
 
-    button:SetScript("OnEnter", function() hovered = true; render() end)
-    button:SetScript("OnLeave", function() hovered = false; render() end)
-    if options.onClick then button:SetScript("OnClick", options.onClick) end
-    render()
+    button:SetScript("OnEnter", function()
+        isHovered = true
+        RefreshAppearance()
+    end)
+
+    button:SetScript("OnLeave", function()
+        isHovered = false
+        RefreshAppearance()
+    end)
+
+    if options.onClick then
+        button:SetScript("OnClick", options.onClick)
+    end
+
+    RefreshAppearance()
     return button
 end

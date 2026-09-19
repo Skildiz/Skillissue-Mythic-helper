@@ -1,33 +1,61 @@
 local _, SMhelper = ...
 
--- window header with title and close button
-local API, Config = SMhelper.UI.API, SMhelper.Config
+-- Main-window header. It builds the title and close control; drag behavior is
+-- attached by MainWindow because that component owns the movable frame.
+local API = SMhelper.UI.API
+local Config = SMhelper.Config
+local Layout = Config.Layout
+
 SMhelper.UI.Header = SMhelper.UI.Header or {}
 local Header = SMhelper.UI.Header
-local frame
+local headerFrame
 
--- create the header once
-function Header:Create(parent, onClose)
-    if frame then return frame end
+-- Create the title while reserving space for the close button.
+local function CreateHeaderTitle(parent)
+    local title = API:CreateLabel(parent, Config.title, {
+        color = Config.colors.text,
+        fontSize = Layout.HEADER_TITLE_FONT_SIZE,
+    })
 
-    frame = API:CreatePanel(parent, { height = Config.headerHeight, color = Config.colors.panel })
-    frame:SetFrameLevel(parent:GetFrameLevel() + 1)
-
-    local title = API:CreateLabel(frame, Config.title, { color = Config.colors.text, fontSize = 18 })
     title:SetPoint("LEFT", Config.padding, 0)
-    title:SetPoint("RIGHT", -48, 0)
+    title:SetPoint("RIGHT", Layout.HEADER_TITLE_RIGHT_MARGIN, 0)
+    return title
+end
 
-    -- simple close button
-    local close = API:CreateButton(frame, {
+-- Create a transparent close control with a hover background.
+local function CreateCloseButton(parent, onClose)
+    local closeButton = API:CreateButton(parent, {
         text = "X",
-        width = 32,
-        height = 32,
-        color = { 0, 0, 0, 0 },
+        width = Layout.HEADER_CLOSE_SIZE,
+        height = Layout.HEADER_CLOSE_SIZE,
+        color = Config.colors.transparent,
         hoverColor = Config.colors.panelHover,
         onClick = onClose,
     })
-    close:SetPoint("TOPRIGHT", -8, -9)
 
-    API:CreateBorder(frame, Config.colors.border, 1)
-    return frame
+    closeButton:SetPoint(
+        "TOPRIGHT",
+        Layout.HEADER_CLOSE_X,
+        Layout.HEADER_CLOSE_Y
+    )
+    return closeButton
+end
+
+-- Build the header once and reuse it for the lifetime of the addon.
+function Header:Create(parent, onClose)
+    if headerFrame then
+        return headerFrame
+    end
+
+    headerFrame = API:CreatePanel(parent, {
+        height = Config.headerHeight,
+        color = Config.colors.panel,
+    })
+    headerFrame:SetFrameLevel(parent:GetFrameLevel() + 1)
+
+    CreateHeaderTitle(headerFrame)
+    CreateCloseButton(headerFrame, onClose)
+    API:CreateBorder(headerFrame, Config.colors.border, 1)
+
+    return headerFrame
 end

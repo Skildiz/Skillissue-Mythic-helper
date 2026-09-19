@@ -1,95 +1,108 @@
 local _, SMhelper = ...
 
--- Automatically repairs all damaged equipment when a repair merchant opens.
+-- Automatic repair module. It listens only while enabled, prefers guild
+-- repair funds when available, and never spends personal gold unless the
+-- character can afford the complete repair.
 SMhelper.Modules = SMhelper.Modules or {}
 SMhelper.Modules.AutoRepair = SMhelper.Modules.AutoRepair or {}
 
 local AutoRepair = SMhelper.Modules.AutoRepair
-
-local config = {}
+local settings = {}
 local eventFrame
 
--- Repair all damaged equipment when a repair merchant opens.
-local function RepairAtMerchant()
-    if config.enabled ~= true then
-        return
-    end
+local function CanAffordRepair(repairCost)
+    return GetMoney() >= repairCost
+end
 
-    if not CanMerchantRepair() then
-        return
-    end
+local function CanUseGuildRepair()
+    return IsInGuild()
+        and CanGuildBankRepair
+        and CanGuildBankRepair()
+end
 
+-- Return a positive full-repair cost, or nil when nothing can be repaired.
+local function GetValidRepairCost()
     local repairCost, canRepair = GetRepairAllCost()
 
     if not canRepair or not repairCost or repairCost <= 0 then
+        return nil
+    end
+
+    return repairCost
+end
+
+-- Perform one repair attempt when a repair-capable merchant window opens.
+local function RepairDamagedEquipment()
+    if settings.enabled ~= true or not CanMerchantRepair() then
         return
     end
 
-    -- Use guild repair funds when they are available.
-    local useGuildBank = IsInGuild()
-        and CanGuildBankRepair
-        and CanGuildBankRepair()
+    local repairCost = GetValidRepairCost()
 
-    if useGuildBank then
+    if not repairCost then
+        return
+    end
+
+    if CanUseGuildRepair() then
         RepairAllItems(true)
-        return
-    end
-
-    -- Use personal gold only when the full repair is affordable.
-    if GetMoney() >= repairCost then
+    elseif CanAffordRepair(repairCost) then
         RepairAllItems(false)
     end
 end
 
--- Register or unregister the merchant event.
-local function ApplyEventState()
-    if not eventFrame then
-        eventFrame = CreateFrame("Frame")
-
-        eventFrame:SetScript("OnEvent", function(_, event)
-            if event == "MERCHANT_SHOW" then
-                RepairAtMerchant()
-            end
-        end)
-    end
-
-    if config.enabled == true then
-        eventFrame:RegisterEvent("MERCHANT_SHOW")
-    else
-        eventFrame:UnregisterEvent("MERCHANT_SHOW")
+local function HandleMerchantEvent(_, eventName)
+    if eventName == "MERCHANT_SHOW" then
+        RepairDamagedEquipment()
     end
 end
 
--- Load the saved Auto Repair option.
+-- Lazily create the invisible frame used only for merchant events.
+local function GetOrCreateEventFrame()
+    if eventFrame then
+        return eventFrame
+    end
+
+    eventFrame = CreateFrame("Frame")
+    eventFrame:SetScript("OnEvent", HandleMerchantEvent)
+    return eventFrame
+end
+
+-- Avoid unnecessary event callbacks by listening only while enabled.
+local function RefreshMerchantEventRegistration()
+    local frame = GetOrCreateEventFrame()
+
+    if settings.enabled == true then
+        frame:RegisterEvent("MERCHANT_SHOW")
+    else
+        frame:UnregisterEvent("MERCHANT_SHOW")
+    end
+end
+
+-- Store the live settings table directly in SavedVariables.
+local function SaveSettings()
+    SMhelperDB = SMhelperDB or {}
+    SMhelperDB.autoRepair = settings
+end
+
+-- Restore persisted state, apply defaults, and synchronize event registration.
 function AutoRepair:Initialize(savedState)
-    if type(savedState) == "table" then
-        config = savedState
-    else
-        config = {}
+    settings = type(savedState) == "table" and savedState or {}
+
+    if settings.enabled == nil then
+        settings.enabled = false
     end
 
-    -- Auto Repair is disabled by default.
-    if config.enabled == nil then
-        config.enabled = false
-    end
-
-    SMhelperDB = SMhelperDB or {}
-    SMhelperDB.autoRepair = config
-
-    ApplyEventState()
+    SaveSettings()
+    RefreshMerchantEventRegistration()
 end
 
--- Return the current Auto Repair state.
 function AutoRepair:IsEnabled()
-    return config.enabled == true
+    return settings.enabled == true
 end
 
--- Enable or disable Auto Repair and save the new state.
+-- Persist the new state and immediately update event registration.
 function AutoRepair:SetEnabled(value)
-    config.enabled = value and true or false
-
-    SMhelperDB = SMhelperDB or {}
-    SMhelperDB.autoRepair = config
-
-    ApplyEventState()
+    settings.enabled = value == true
+    SaveSettings()
+    RefreshMerchantEventRegistration()
 end

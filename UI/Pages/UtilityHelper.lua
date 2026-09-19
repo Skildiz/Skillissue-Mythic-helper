@@ -1,18 +1,30 @@
 local _, SMhelper = ...
 
-local Layout = SMhelper.Config.Layout
+local Config = SMhelper.Config
+local Layout = Config.Layout
+local PageConfig = Config.Pages.UtilityHelper
+local Anchors = Config.UI.AnchorPoints
 
 -- Register the Utility Helper placeholder page. Additional utility controls can
 -- be added to this lazy factory without changing window composition code.
-SMhelper.UI:RegisterPage("utilityHelper", {
-    title = "Utility helper",
+SMhelper.UI:RegisterPage(PageConfig.NAME, {
+    title = PageConfig.TITLE,
     create = function(parent)
-        local page = CreateFrame("Frame", nil, parent)
-        local label = SMhelper.UI.API:CreateLabel(page, "Utility helper", {
-            color = SMhelper.Config.colors.text,
-            fontSize = Layout.PAGE_TITLE_FONT_SIZE,
+        local page = CreateFrame(
+            Config.UI.FrameTypes.FRAME,
+            PageConfig.Frame.NAME,
+            parent
+        )
+        local label = SMhelper.UI.API:CreateLabel(page, PageConfig.TITLE, {
+            name = PageConfig.Frame.Label.NAME,
+            color = Config.colors.text,
+            fontSize = Layout.Page.Title.FONT_SIZE,
         })
-        label:SetPoint("TOPLEFT", Layout.PAGE_TITLE_X, Layout.PAGE_TITLE_Y)
+        label:SetPoint(
+            Anchors.TOP_LEFT,
+            Layout.Page.Title.X,
+            Layout.Page.Title.Y
+        )
         return page
     end,
 })

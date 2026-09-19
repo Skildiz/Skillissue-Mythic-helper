@@ -4,6 +4,9 @@ local _, SMhelper = ...
 -- Core so this component does not depend on the window implementation.
 local Config = SMhelper.Config
 local Layout = Config.Layout
+local MinimapConfig = Config.UI.Minimap
+local UIConfig = Config.UI
+local Anchors = UIConfig.AnchorPoints
 
 SMhelper.UI.Minimap = SMhelper.UI.Minimap or {}
 local MinimapButton = SMhelper.UI.Minimap
@@ -13,28 +16,34 @@ local clickHandler
 
 -- Apply asset paths from Config rather than embedding texture paths here.
 local function ConfigureButtonTextures(button)
-    button:SetNormalTexture(Config.Paths.MINIMAP_ICON)
-    button:SetHighlightTexture(Config.Paths.MINIMAP_HIGHLIGHT)
+    button:SetNormalTexture(Config.Paths.Interface.Icons.MINIMAP)
+    button:SetHighlightTexture(Config.Paths.Interface.Minimap.HIGHLIGHT)
 end
 
 -- Attach click and tooltip behavior to the button.
 local function ConfigureButtonScripts(button)
-    button:SetScript("OnClick", function()
-        if clickHandler then
-            clickHandler()
-        end
-    end)
+    local tooltip = MinimapConfig.Tooltip
+    local tooltipColor = tooltip.TEXT_COLOR
+    local scripts = {
+        [UIConfig.Scripts.CLICK] = function()
+            if clickHandler then
+                clickHandler()
+            end
+        end,
+        [UIConfig.Scripts.ENTER] = function(self)
+            GameTooltip:SetOwner(self, tooltip.ANCHOR)
+            GameTooltip:SetText(Config.addonName)
+            GameTooltip:AddLine(tooltip.TEXT, unpack(tooltipColor))
+            GameTooltip:Show()
+        end,
+        [UIConfig.Scripts.LEAVE] = function()
+            GameTooltip:Hide()
+        end,
+    }
 
-    button:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetText(Config.addonName)
-        GameTooltip:AddLine("Click to toggle", 1, 1, 1)
-        GameTooltip:Show()
-    end)
-
-    button:SetScript("OnLeave", function()
-        GameTooltip:Hide()
-    end)
+    for scriptName, handler in pairs(scripts) do
+        button:SetScript(scriptName, handler)
+    end
 end
 
 function MinimapButton:SetOnClick(callback)
@@ -47,17 +56,17 @@ function MinimapButton:Create()
         return minimapButtonFrame
     end
 
-    minimapButtonFrame = CreateFrame("Button", nil, Minimap)
+    minimapButtonFrame = CreateFrame(UIConfig.FrameTypes.BUTTON, nil, Minimap)
     minimapButtonFrame:SetSize(
-        Layout.MINIMAP_BUTTON_SIZE,
-        Layout.MINIMAP_BUTTON_SIZE
+        Layout.Minimap.Button.SIZE,
+        Layout.Minimap.Button.SIZE
     )
     minimapButtonFrame:SetPoint(
-        "TOPLEFT",
+        Anchors.TOP_LEFT,
         Minimap,
-        "TOPLEFT",
-        Layout.MINIMAP_BUTTON_X,
-        Layout.MINIMAP_BUTTON_Y
+        Anchors.TOP_LEFT,
+        Layout.Minimap.Button.X,
+        Layout.Minimap.Button.Y
     )
 
     ConfigureButtonTextures(minimapButtonFrame)

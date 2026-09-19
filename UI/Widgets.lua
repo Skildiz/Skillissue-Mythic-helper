@@ -5,6 +5,11 @@ local _, SMhelper = ...
 local API = SMhelper.UI.API
 local Config = SMhelper.Config
 local Layout = Config.Layout
+local UIConfig = Config.UI
+local Anchors = UIConfig.AnchorPoints
+local Layers = UIConfig.DrawLayers
+local Scripts = UIConfig.Scripts
+local ZERO_OFFSET = Layout.Anchor.ZERO_OFFSET
 
 SMhelper.UI.Widgets = SMhelper.UI.Widgets or {}
 local Widgets = SMhelper.UI.Widgets
@@ -13,16 +18,16 @@ local Widgets = SMhelper.UI.Widgets
 local function RefreshToggleAppearance(button, knob, isEnabled)
     if isEnabled then
         button.Background:SetColorTexture(unpack(Config.colors.accent))
-        knob:SetColorTexture(unpack(Config.colors.white))
+        knob:SetColorTexture(unpack(Config.colors.toggleKnobEnabled))
         knob:ClearAllPoints()
-        knob:SetPoint("RIGHT", -Layout.TOGGLE_KNOB_OFFSET, 0)
+        knob:SetPoint(Anchors.RIGHT, -Layout.Toggle.KNOB_OFFSET, ZERO_OFFSET)
         return
     end
 
     button.Background:SetColorTexture(unpack(Config.colors.panel))
     knob:SetColorTexture(unpack(Config.colors.toggleDisabled))
     knob:ClearAllPoints()
-    knob:SetPoint("LEFT", Layout.TOGGLE_KNOB_OFFSET, 0)
+    knob:SetPoint(Anchors.LEFT, Layout.Toggle.KNOB_OFFSET, ZERO_OFFSET)
 end
 
 -- Add value accessors and user-interaction behavior to a toggle panel.
@@ -42,7 +47,7 @@ local function AddToggleMethods(button, knob, initialValue, callback)
         return currentValue
     end
 
-    button:SetScript("OnMouseUp", function()
+    button:SetScript(Scripts.MOUSE_UP, function()
         button:SetValue(not currentValue)
     end)
 
@@ -52,28 +57,42 @@ end
 local function CreateDropdownButton(parent, options)
     local dropdown = API:CreateButton(parent, {
         width = options.width,
-        height = Layout.DROPDOWN_HEIGHT,
+        height = Layout.Dropdown.HEIGHT,
         color = Config.colors.panel,
         hoverColor = Config.colors.panelHover,
         textColor = Config.colors.text,
-        justifyH = "LEFT",
+        justifyH = UIConfig.HorizontalAlignment.LEFT,
     })
 
-    API:CreateBorder(dropdown, Config.colors.border, 1)
+    API:CreateBorder(
+        dropdown,
+        Config.colors.border,
+        Layout.Border.DEFAULT_THICKNESS
+    )
     return dropdown
 end
 
 local function CreateDropdownArrow(dropdown)
-    local arrow = dropdown:CreateTexture(nil, "OVERLAY")
+    local arrow = dropdown:CreateTexture(nil, Layers.OVERLAY)
 
-    arrow:SetSize(Layout.DROPDOWN_ARROW_SIZE, Layout.DROPDOWN_ARROW_SIZE)
-    arrow:SetPoint("RIGHT", Layout.DROPDOWN_ARROW_RIGHT, 0)
-    arrow:SetTexture(Config.Paths.DROPDOWN_ARROW)
+    arrow:SetSize(Layout.Dropdown.ARROW_SIZE, Layout.Dropdown.ARROW_SIZE)
+    arrow:SetPoint(Anchors.RIGHT, Layout.Dropdown.ARROW_RIGHT, ZERO_OFFSET)
+    arrow:SetTexture(Config.Paths.Interface.Buttons.DROPDOWN_ARROW)
 
     dropdown.Label:ClearAllPoints()
-    dropdown.Label:SetPoint("LEFT", Layout.BUTTON_TEXT_INSET, 0)
-    dropdown.Label:SetPoint("RIGHT", arrow, "LEFT", -Layout.DROPDOWN_MENU_PADDING, 0)
-    dropdown.Label:SetJustifyH("LEFT")
+    dropdown.Label:SetPoint(
+        Anchors.LEFT,
+        Layout.Button.TEXT_INSET,
+        ZERO_OFFSET
+    )
+    dropdown.Label:SetPoint(
+        Anchors.RIGHT,
+        arrow,
+        Anchors.LEFT,
+        -Layout.Dropdown.MENU_PADDING,
+        ZERO_OFFSET
+    )
+    dropdown.Label:SetJustifyH(UIConfig.HorizontalAlignment.LEFT)
     dropdown.Label:SetWordWrap(false)
 end
 
@@ -83,13 +102,23 @@ local function CreateDropdownMenu(dropdown, width, itemCount)
         color = Config.colors.panelHover,
     })
 
-    menu:SetFrameLevel(dropdown:GetFrameLevel() + Layout.RESIZE_FRAME_LEVEL_OFFSET)
-    menu:SetPoint("TOPRIGHT", dropdown, "BOTTOMRIGHT", 0, Layout.DROPDOWN_MENU_OFFSET_Y)
-    menu:SetHeight(
-        Layout.DROPDOWN_MENU_VERTICAL_PADDING
-        + itemCount * Layout.DROPDOWN_ROW_HEIGHT
+    menu:SetFrameLevel(dropdown:GetFrameLevel() + Layout.ResizeHandle.FRAME_LEVEL_OFFSET)
+    menu:SetPoint(
+        Anchors.TOP_RIGHT,
+        dropdown,
+        Anchors.BOTTOM_RIGHT,
+        ZERO_OFFSET,
+        Layout.Dropdown.MENU_OFFSET_Y
     )
-    API:CreateBorder(menu, Config.colors.border, 1)
+    menu:SetHeight(
+        Layout.Dropdown.MENU_VERTICAL_PADDING
+        + itemCount * Layout.Dropdown.ROW_HEIGHT
+    )
+    API:CreateBorder(
+        menu,
+        Config.colors.border,
+        Layout.Border.DEFAULT_THICKNESS
+    )
     menu:Hide()
 
     return menu
@@ -97,9 +126,10 @@ end
 
 -- Build one checkbox row and return a function that refreshes its check mark.
 local function CreateDropdownEntry(menu, dropdown, options, item, index)
-    local padding = Layout.DROPDOWN_MENU_PADDING
-    local rowHeight = Layout.DROPDOWN_ROW_HEIGHT
-    local topOffset = -padding - (index - 1) * rowHeight
+    local padding = Layout.Dropdown.MENU_PADDING
+    local rowHeight = Layout.Dropdown.ROW_HEIGHT
+    local topOffset = -padding
+        - (index - Config.Collections.FIRST_INDEX) * rowHeight
 
     local entry = API:CreateButton(menu, {
         height = rowHeight,
@@ -107,28 +137,36 @@ local function CreateDropdownEntry(menu, dropdown, options, item, index)
         hoverColor = Config.colors.panelHover,
         textColor = Config.colors.text,
         text = item.text,
-        justifyH = "LEFT",
-        textInset = Layout.DROPDOWN_ENTRY_TEXT_INSET,
+        justifyH = UIConfig.HorizontalAlignment.LEFT,
+        textInset = Layout.Dropdown.ENTRY_TEXT_INSET,
     })
 
-    entry:SetPoint("TOPLEFT", padding, topOffset)
-    entry:SetPoint("TOPRIGHT", -padding, topOffset)
+    entry:SetPoint(Anchors.TOP_LEFT, padding, topOffset)
+    entry:SetPoint(Anchors.TOP_RIGHT, -padding, topOffset)
 
-    local emptyBox = entry:CreateTexture(nil, "ARTWORK")
-    emptyBox:SetSize(Layout.DROPDOWN_CHECKBOX_SIZE, Layout.DROPDOWN_CHECKBOX_SIZE)
-    emptyBox:SetPoint("LEFT", Layout.DROPDOWN_CHECKBOX_LEFT, 0)
-    emptyBox:SetTexture(Config.Paths.CHECKBOX_EMPTY)
+    local emptyBox = entry:CreateTexture(nil, Layers.ARTWORK)
+    emptyBox:SetSize(Layout.Dropdown.CHECKBOX_SIZE, Layout.Dropdown.CHECKBOX_SIZE)
+    emptyBox:SetPoint(
+        Anchors.LEFT,
+        Layout.Dropdown.CHECKBOX_LEFT,
+        ZERO_OFFSET
+    )
+    emptyBox:SetTexture(Config.Paths.Interface.Buttons.CHECKBOX.EMPTY)
 
-    local checkMark = entry:CreateTexture(nil, "OVERLAY")
-    checkMark:SetSize(Layout.DROPDOWN_CHECKBOX_SIZE, Layout.DROPDOWN_CHECKBOX_SIZE)
-    checkMark:SetPoint("LEFT", Layout.DROPDOWN_CHECKBOX_LEFT, 0)
-    checkMark:SetTexture(Config.Paths.CHECKBOX_CHECKED)
+    local checkMark = entry:CreateTexture(nil, Layers.OVERLAY)
+    checkMark:SetSize(Layout.Dropdown.CHECKBOX_SIZE, Layout.Dropdown.CHECKBOX_SIZE)
+    checkMark:SetPoint(
+        Anchors.LEFT,
+        Layout.Dropdown.CHECKBOX_LEFT,
+        ZERO_OFFSET
+    )
+    checkMark:SetTexture(Config.Paths.Interface.Buttons.CHECKBOX.CHECKED)
 
     local function RefreshCheckMark()
         checkMark:SetShown(options.getValue(item.key) == true)
     end
 
-    entry:SetScript("OnClick", function()
+    entry:SetScript(Scripts.CLICK, function()
         local newValue = options.getValue(item.key) ~= true
         options.setValue(item.key, newValue)
         RefreshCheckMark()
@@ -154,7 +192,9 @@ local function AddDropdownMethods(dropdown, menu, options, refreshEntries)
 
     function dropdown:SetEnabled(enabled)
         self.isEnabled = enabled == true
-        self:SetAlpha(self.isEnabled and 1 or 0.3)
+        self:SetAlpha(
+            self.isEnabled and Config.Opacity.ENABLED or Config.Opacity.DISABLED
+        )
         self:EnableMouse(self.isEnabled)
 
         if not self.isEnabled then
@@ -162,7 +202,7 @@ local function AddDropdownMethods(dropdown, menu, options, refreshEntries)
         end
     end
 
-    dropdown:SetScript("OnClick", function()
+    dropdown:SetScript(Scripts.CLICK, function()
         if dropdown.isEnabled then
             menu:SetShown(not menu:IsShown())
         end
@@ -183,18 +223,24 @@ end
 -- Create a labeled switch with normalized boolean state.
 function Widgets:CreateToggle(parent, text, initialValue, callback)
     local button = API:CreatePanel(parent, {
-        width = Layout.TOGGLE_WIDTH,
-        height = Layout.TOGGLE_HEIGHT,
+        width = Layout.Toggle.WIDTH,
+        height = Layout.Toggle.HEIGHT,
         color = Config.colors.panel,
     })
     button:EnableMouse(true)
 
-    local knob = button:CreateTexture(nil, "ARTWORK")
-    knob:SetSize(Layout.TOGGLE_KNOB_SIZE, Layout.TOGGLE_KNOB_SIZE)
+    local knob = button:CreateTexture(nil, Layers.ARTWORK)
+    knob:SetSize(Layout.Toggle.KNOB_SIZE, Layout.Toggle.KNOB_SIZE)
     button.Knob = knob
 
     local label = API:CreateLabel(parent, text, { color = Config.colors.text })
-    label:SetPoint("LEFT", button, "RIGHT", Layout.TOGGLE_LABEL_GAP, 0)
+    label:SetPoint(
+        Anchors.LEFT,
+        button,
+        Anchors.RIGHT,
+        Layout.Toggle.LABEL_GAP,
+        ZERO_OFFSET
+    )
     button.Label = label
 
     AddToggleMethods(button, knob, initialValue, callback)
@@ -203,46 +249,76 @@ end
 
 -- Create an uppercase heading with a divider and report consumed vertical space.
 function Widgets:CreateSectionHeader(parent, text, y_pos)
-    local frame = CreateFrame("Frame", nil, parent)
-    local verticalPosition = y_pos or 0
+    local frame = CreateFrame(UIConfig.FrameTypes.FRAME, nil, parent)
+    local verticalPosition = y_pos or ZERO_OFFSET
 
-    frame:SetHeight(Layout.SECTION_HEADER_HEIGHT)
-    frame:SetPoint("TOPLEFT", 0, verticalPosition)
-    frame:SetPoint("TOPRIGHT", 0, verticalPosition)
+    frame:SetHeight(Layout.SectionHeader.HEIGHT)
+    frame:SetPoint(Anchors.TOP_LEFT, ZERO_OFFSET, verticalPosition)
+    frame:SetPoint(Anchors.TOP_RIGHT, ZERO_OFFSET, verticalPosition)
 
     local label = API:CreateLabel(frame, string.upper(text or ""), {
         color = Config.colors.mutedText,
-        fontSize = Layout.SECTION_HEADER_FONT_SIZE,
+        fontSize = Layout.SectionHeader.FONT_SIZE,
     })
-    label:SetPoint("LEFT", 0, 0)
+    label:SetPoint(Anchors.LEFT, ZERO_OFFSET, ZERO_OFFSET)
 
-    local divider = frame:CreateTexture(nil, "ARTWORK")
-    divider:SetHeight(Layout.SECTION_DIVIDER_HEIGHT)
+    local divider = frame:CreateTexture(nil, Layers.ARTWORK)
+    divider:SetHeight(Layout.SectionHeader.DIVIDER_HEIGHT)
     divider:SetColorTexture(unpack(Config.colors.border))
-    divider:SetPoint("LEFT", label, "RIGHT", Layout.SECTION_DIVIDER_GAP, 0)
-    divider:SetPoint("RIGHT", 0, 0)
+    divider:SetPoint(
+        Anchors.LEFT,
+        label,
+        Anchors.RIGHT,
+        Layout.SectionHeader.DIVIDER_GAP,
+        ZERO_OFFSET
+    )
+    divider:SetPoint(Anchors.RIGHT, ZERO_OFFSET, ZERO_OFFSET)
 
     frame.Label = label
-    return frame, Layout.SECTION_HEADER_SPACE
+    return frame, Layout.SectionHeader.SPACE
 end
 
 -- Create equal left/right regions separated by the configured column gap.
 function Widgets:CreateTwoColumnRow(parent, y_pos, height)
-    local rowHeight = height or Layout.ROW_HEIGHT
-    local verticalPosition = y_pos or 0
-    local row = CreateFrame("Frame", nil, parent)
+    local rowHeight = height or Layout.Row.HEIGHT
+    local verticalPosition = y_pos or ZERO_OFFSET
+    local row = CreateFrame(UIConfig.FrameTypes.FRAME, nil, parent)
 
     row:SetHeight(rowHeight)
-    row:SetPoint("TOPLEFT", 0, verticalPosition)
-    row:SetPoint("TOPRIGHT", 0, verticalPosition)
+    row:SetPoint(Anchors.TOP_LEFT, ZERO_OFFSET, verticalPosition)
+    row:SetPoint(Anchors.TOP_RIGHT, ZERO_OFFSET, verticalPosition)
 
-    local leftRegion = CreateFrame("Frame", nil, row)
-    leftRegion:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
-    leftRegion:SetPoint("BOTTOMRIGHT", row, "BOTTOM", -Layout.ROW_COLUMN_GAP, 0)
+    local leftRegion = CreateFrame(UIConfig.FrameTypes.FRAME, nil, row)
+    leftRegion:SetPoint(
+        Anchors.TOP_LEFT,
+        row,
+        Anchors.TOP_LEFT,
+        ZERO_OFFSET,
+        ZERO_OFFSET
+    )
+    leftRegion:SetPoint(
+        Anchors.BOTTOM_RIGHT,
+        row,
+        Anchors.BOTTOM,
+        -Layout.Row.COLUMN_GAP,
+        ZERO_OFFSET
+    )
 
-    local rightRegion = CreateFrame("Frame", nil, row)
-    rightRegion:SetPoint("TOPLEFT", row, "TOP", Layout.ROW_COLUMN_GAP, 0)
-    rightRegion:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
+    local rightRegion = CreateFrame(UIConfig.FrameTypes.FRAME, nil, row)
+    rightRegion:SetPoint(
+        Anchors.TOP_LEFT,
+        row,
+        Anchors.TOP,
+        Layout.Row.COLUMN_GAP,
+        ZERO_OFFSET
+    )
+    rightRegion:SetPoint(
+        Anchors.BOTTOM_RIGHT,
+        row,
+        Anchors.BOTTOM_RIGHT,
+        ZERO_OFFSET,
+        ZERO_OFFSET
+    )
 
     row.Left = leftRegion
     row.Right = rightRegion
@@ -255,21 +331,40 @@ function Widgets:CreateRowToggle(region, text, initialValue, callback, tooltip)
     local toggle = self:CreateToggle(region, text, initialValue, callback)
 
     toggle:ClearAllPoints()
-    toggle:SetPoint("RIGHT", region, "RIGHT", Layout.ROW_TOGGLE_RIGHT_MARGIN, 0)
+    toggle:SetPoint(
+        Anchors.RIGHT,
+        region,
+        Anchors.RIGHT,
+        Layout.Row.TOGGLE_RIGHT_MARGIN,
+        ZERO_OFFSET
+    )
 
     toggle.Label:ClearAllPoints()
-    toggle.Label:SetPoint("LEFT", region, "LEFT", 0, 0)
-    toggle.Label:SetPoint("RIGHT", toggle, "LEFT", -Layout.TOGGLE_LABEL_GAP, 0)
-    toggle.Label:SetJustifyH("LEFT")
+    toggle.Label:SetPoint(
+        Anchors.LEFT,
+        region,
+        Anchors.LEFT,
+        ZERO_OFFSET,
+        ZERO_OFFSET
+    )
+    toggle.Label:SetPoint(
+        Anchors.RIGHT,
+        toggle,
+        Anchors.LEFT,
+        -Layout.Toggle.LABEL_GAP,
+        ZERO_OFFSET
+    )
+    toggle.Label:SetJustifyH(UIConfig.HorizontalAlignment.LEFT)
 
     if tooltip then
-        toggle:HookScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(text, 1, 1, 1)
+        toggle:HookScript(Scripts.ENTER, function(self)
+            local tooltipColor = Config.colors.tooltipTitle
+            GameTooltip:SetOwner(self, Config.UI.Tooltip.ANCHOR)
+            GameTooltip:SetText(text, unpack(tooltipColor))
             GameTooltip:AddLine(tooltip, nil, nil, nil, true)
             GameTooltip:Show()
         end)
-        toggle:HookScript("OnLeave", function()
+        toggle:HookScript(Scripts.LEAVE, function()
             GameTooltip:Hide()
         end)
     end
@@ -281,7 +376,7 @@ end
 function Widgets:CreateCheckboxDropdown(parent, options)
     options = options or {}
     options.items = options.items or {}
-    options.width = options.width or Layout.DROPDOWN_WIDTH
+    options.width = options.width or Layout.Dropdown.WIDTH
 
     local dropdown = CreateDropdownButton(parent, options)
     CreateDropdownArrow(dropdown)

@@ -7,6 +7,8 @@ SMhelper.Modules = SMhelper.Modules or {}
 SMhelper.Modules.AutoRepair = SMhelper.Modules.AutoRepair or {}
 
 local AutoRepair = SMhelper.Modules.AutoRepair
+local Config = SMhelper.Config
+local MERCHANT_SHOW_EVENT = Config.Events.MERCHANT_SHOW
 local settings = {}
 local eventFrame
 
@@ -24,7 +26,9 @@ end
 local function GetValidRepairCost()
     local repairCost, canRepair = GetRepairAllCost()
 
-    if not canRepair or not repairCost or repairCost <= 0 then
+    if not canRepair
+        or not repairCost
+        or repairCost <= Config.AutoRepair.MIN_REPAIR_COST then
         return nil
     end
 
@@ -51,7 +55,7 @@ local function RepairDamagedEquipment()
 end
 
 local function HandleMerchantEvent(_, eventName)
-    if eventName == "MERCHANT_SHOW" then
+    if eventName == MERCHANT_SHOW_EVENT then
         RepairDamagedEquipment()
     end
 end
@@ -62,8 +66,8 @@ local function GetOrCreateEventFrame()
         return eventFrame
     end
 
-    eventFrame = CreateFrame("Frame")
-    eventFrame:SetScript("OnEvent", HandleMerchantEvent)
+    eventFrame = CreateFrame(Config.UI.FrameTypes.FRAME)
+    eventFrame:SetScript(Config.UI.Scripts.EVENT, HandleMerchantEvent)
     return eventFrame
 end
 
@@ -72,9 +76,9 @@ local function RefreshMerchantEventRegistration()
     local frame = GetOrCreateEventFrame()
 
     if settings.enabled == true then
-        frame:RegisterEvent("MERCHANT_SHOW")
+        frame:RegisterEvent(MERCHANT_SHOW_EVENT)
     else
-        frame:UnregisterEvent("MERCHANT_SHOW")
+        frame:UnregisterEvent(MERCHANT_SHOW_EVENT)
     end
 end
 

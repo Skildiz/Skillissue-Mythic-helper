@@ -9,6 +9,10 @@ local API = UI.API
 local Header = UI.Header
 local Sidebar = UI.Sidebar
 local Content = UI.Content
+local UIConfig = Config.UI
+local Anchors = UIConfig.AnchorPoints
+local Scripts = UIConfig.Scripts
+local ZERO_OFFSET = Layout.Anchor.ZERO_OFFSET
 
 local mainFrame
 local contentFrame
@@ -23,7 +27,7 @@ local function CreateMainFrame()
         color = Config.colors.background,
     })
 
-    frame:SetPoint("CENTER")
+    frame:SetPoint(Anchors.CENTER)
     frame:SetFrameStrata(Config.frameStrata)
     frame:SetFrameLevel(Config.frameLevel)
     frame:SetMovable(true)
@@ -31,7 +35,11 @@ local function CreateMainFrame()
     frame:SetResizeBounds(Config.minWidth, Config.minHeight)
     frame:EnableMouse(true)
     frame:SetClampedToScreen(true)
-    API:CreateBorder(frame, Config.colors.border, 1)
+    API:CreateBorder(
+        frame,
+        Config.colors.border,
+        Layout.Border.DEFAULT_THICKNESS
+    )
 
     return frame
 end
@@ -42,14 +50,14 @@ local function CreateWindowHeader(frame)
         UI:Hide()
     end)
 
-    header:SetPoint("TOPLEFT")
-    header:SetPoint("TOPRIGHT")
+    header:SetPoint(Anchors.TOP_LEFT)
+    header:SetPoint(Anchors.TOP_RIGHT)
     header:EnableMouse(true)
-    header:RegisterForDrag("LeftButton")
-    header:SetScript("OnDragStart", function()
+    header:RegisterForDrag(UIConfig.MouseButtons.LEFT)
+    header:SetScript(Scripts.DRAG_START, function()
         frame:StartMoving()
     end)
-    header:SetScript("OnDragStop", function()
+    header:SetScript(Scripts.DRAG_STOP, function()
         frame:StopMovingOrSizing()
     end)
 
@@ -58,42 +66,52 @@ end
 
 local function CreateWindowSidebar(frame, header)
     local sidebar = Sidebar:Create(frame)
-    sidebar:SetPoint("TOPLEFT", header, "BOTTOMLEFT")
-    sidebar:SetPoint("BOTTOMLEFT")
+    sidebar:SetPoint(Anchors.TOP_LEFT, header, Anchors.BOTTOM_LEFT)
+    sidebar:SetPoint(Anchors.BOTTOM_LEFT)
     return sidebar
 end
 
 local function CreateContentFrame(frame, sidebar)
     local content = Content:Create(frame)
-    content:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", Config.padding, 0)
-    content:SetPoint("BOTTOMRIGHT", -Config.padding, Config.padding)
+    content:SetPoint(
+        Anchors.TOP_LEFT,
+        sidebar,
+        Anchors.TOP_RIGHT,
+        Config.padding,
+        ZERO_OFFSET
+    )
+    content:SetPoint(
+        Anchors.BOTTOM_RIGHT,
+        -Config.padding,
+        Config.padding
+    )
     return content
 end
 
 -- Create the bottom-right grip and connect mouse gestures to frame resizing.
 local function CreateResizeHandle(frame)
-    local resizeHandle = CreateFrame("Button", nil, frame)
+    local resizeHandle = CreateFrame(UIConfig.FrameTypes.BUTTON, nil, frame)
 
-    resizeHandle:SetSize(Layout.RESIZE_HANDLE_SIZE, Layout.RESIZE_HANDLE_SIZE)
+    resizeHandle:SetSize(Layout.ResizeHandle.SIZE, Layout.ResizeHandle.SIZE)
     resizeHandle:SetPoint(
-        "BOTTOMRIGHT",
-        Layout.RESIZE_HANDLE_X,
-        Layout.RESIZE_HANDLE_Y
+        Anchors.BOTTOM_RIGHT,
+        Layout.ResizeHandle.X,
+        Layout.ResizeHandle.Y
     )
     resizeHandle:SetFrameLevel(
-        frame:GetFrameLevel() + Layout.RESIZE_FRAME_LEVEL_OFFSET
+        frame:GetFrameLevel() + Layout.ResizeHandle.FRAME_LEVEL_OFFSET
     )
-    resizeHandle:SetNormalTexture(Config.Paths.RESIZE_NORMAL)
-    resizeHandle:SetHighlightTexture(Config.Paths.RESIZE_HIGHLIGHT)
-    resizeHandle:SetPushedTexture(Config.Paths.RESIZE_PUSHED)
+    resizeHandle:SetNormalTexture(Config.Paths.Interface.ChatFrame.RESIZE_HANDLE.NORMAL)
+    resizeHandle:SetHighlightTexture(Config.Paths.Interface.ChatFrame.RESIZE_HANDLE.HIGHLIGHT)
+    resizeHandle:SetPushedTexture(Config.Paths.Interface.ChatFrame.RESIZE_HANDLE.PUSHED)
 
-    resizeHandle:SetScript("OnMouseDown", function(_, mouseButton)
-        if mouseButton == "LeftButton" then
-            frame:StartSizing("BOTTOMRIGHT")
+    resizeHandle:SetScript(Scripts.MOUSE_DOWN, function(_, mouseButton)
+        if mouseButton == UIConfig.MouseButtons.LEFT then
+            frame:StartSizing(Anchors.BOTTOM_RIGHT)
         end
     end)
 
-    resizeHandle:SetScript("OnMouseUp", function()
+    resizeHandle:SetScript(Scripts.MOUSE_UP, function()
         frame:StopMovingOrSizing()
     end)
 
@@ -131,17 +149,23 @@ local function CreateNavigationButtons()
     end
 end
 
+local function ValidatePageRegistration(pageId, pageSpecification)
+    assert(type(pageId) == "string", "Page ID must be a string")
+    assert(type(pageSpecification) == "table", "Page specification must be a table")
+    assert(
+        type(pageSpecification.create) == "function",
+        "Page specification must provide a create function"
+    )
+end
+
 -- Register a page factory without constructing its frame immediately.
 function UI:RegisterPage(pageId, pageSpecification)
-    assert(
-        type(pageId) == "string"
-        and type(pageSpecification) == "table"
-        and type(pageSpecification.create) == "function",
-        "Invalid page registration"
-    )
+    ValidatePageRegistration(pageId, pageSpecification)
 
     if not registeredPages[pageId] then
-        pageOrder[#pageOrder + 1] = pageId
+        pageOrder[
+            #pageOrder + Config.Collections.NEXT_INDEX_OFFSET
+        ] = pageId
     end
 
     registeredPages[pageId] = pageSpecification

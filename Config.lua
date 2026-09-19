@@ -20,6 +20,11 @@ SMhelper.Config = {
 
     Events = {
         ADDON_LOADED = "ADDON_LOADED",
+        MERCHANT_SHOW = "MERCHANT_SHOW",
+        PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD",
+        ZONE_CHANGED_NEW_AREA = "ZONE_CHANGED_NEW_AREA",
+        CHALLENGE_MODE_START = "CHALLENGE_MODE_START",
+        CHALLENGE_MODE_COMPLETED = "CHALLENGE_MODE_COMPLETED",
     },
 
     SlashCommands = {
@@ -28,8 +33,22 @@ SMhelper.Config = {
     },
 
     Opacity = {
+        OPAQUE = 1,
         ENABLED = 1,
         DISABLED = 0.3,
+    },
+
+    Collections = {
+        FIRST_INDEX = 1,
+        NEXT_INDEX_OFFSET = 1,
+        EMPTY_COUNT = 0,
+    },
+
+    ColorComponents = {
+        RED = 1,
+        GREEN = 2,
+        BLUE = 3,
+        ALPHA = 4,
     },
 
     -- Blizzard texture paths grouped by their Interface directory hierarchy.
@@ -61,6 +80,21 @@ SMhelper.Config = {
 
     -- Pixel measurements grouped by the component that consumes them.
     Layout = {
+        Anchor = {
+            ZERO_OFFSET = 0,
+        },
+        Border = {
+            DEFAULT_THICKNESS = 1,
+        },
+        Frame = {
+            LEVEL_INCREMENT = 1,
+        },
+        Texture = {
+            Button = {
+                GLOW_SUB_LEVEL = -8,
+                BACKGROUND_SUB_LEVEL = -7,
+            },
+        },
         Page = {
             Title = {
                 X = 8,
@@ -147,17 +181,62 @@ SMhelper.Config = {
     },
 
     UI = {
+        FrameTypes = {
+            FRAME = "Frame",
+            BUTTON = "Button",
+        },
+        DrawLayers = {
+            BACKGROUND = "BACKGROUND",
+            ARTWORK = "ARTWORK",
+            OVERLAY = "OVERLAY",
+        },
+        AnchorPoints = {
+            CENTER = "CENTER",
+            TOP = "TOP",
+            BOTTOM = "BOTTOM",
+            LEFT = "LEFT",
+            RIGHT = "RIGHT",
+            TOP_LEFT = "TOPLEFT",
+            TOP_RIGHT = "TOPRIGHT",
+            BOTTOM_LEFT = "BOTTOMLEFT",
+            BOTTOM_RIGHT = "BOTTOMRIGHT",
+        },
+        Scripts = {
+            EVENT = "OnEvent",
+            CLICK = "OnClick",
+            ENTER = "OnEnter",
+            LEAVE = "OnLeave",
+            MOUSE_DOWN = "OnMouseDown",
+            MOUSE_UP = "OnMouseUp",
+            DRAG_START = "OnDragStart",
+            DRAG_STOP = "OnDragStop",
+        },
+        BlendModes = {
+            ADDITIVE = "ADD",
+        },
+        HorizontalAlignment = {
+            LEFT = "LEFT",
+            CENTER = "CENTER",
+        },
+        VerticalAlignment = {
+            MIDDLE = "MIDDLE",
+        },
+        Templates = {
+            BACKDROP = "BackdropTemplate",
+            FONT = "GameFontNormal",
+        },
+        MouseButtons = {
+            LEFT = "LeftButton",
+        },
+        Tooltip = {
+            ANCHOR = "ANCHOR_RIGHT",
+        },
         Header = {
             CloseButton = {
                 TEXT = "X",
             },
         },
         Minimap = {
-            Scripts = {
-                CLICK = "OnClick",
-                ENTER = "OnEnter",
-                LEAVE = "OnLeave",
-            },
             Tooltip = {
                 ANCHOR = "ANCHOR_LEFT",
                 TEXT = "Click to toggle",
@@ -167,6 +246,21 @@ SMhelper.Config = {
     },
 
     Pages = {
+        General = {
+            NAME = "general",
+            TITLE = "General",
+            Frame = {
+                NAME = nil,
+            },
+        },
+        BuffReminder = {
+            NAME = "buffReminder",
+            TITLE = "Buff Reminder",
+            TOGGLE_TEXT = "Enable buff reminders",
+            Frame = {
+                NAME = nil,
+            },
+        },
         UtilityHelper = {
             NAME = "utilityHelper",
             TITLE = "Utility helper",
@@ -177,12 +271,85 @@ SMhelper.Config = {
                 },
             },
         },
+        QualityOfLife = {
+            NAME = "qualityOfLife",
+            TITLE = "Quality of Life",
+            Frame = {
+                NAME = nil,
+                Body = {
+                    NAME = nil,
+                },
+            },
+            Sections = {
+                COMBAT_LOGGING = "AUTO COMBAT LOGGING",
+                GENERAL = "GENERAL",
+            },
+            Controls = {
+                TRIGGERS = "Auto-Log Triggers",
+                RECORDER_COMPATIBILITY = "Warcraft Recorder Compatibility",
+                ENABLE_AUTO_LOGGING = "Enable Auto Logging",
+                ENABLE_AUTO_REPAIR = "Enable Auto Repair",
+            },
+            Tooltips = {
+                RECORDER_COMPATIBILITY = "Delays stopping combat logging by %d "
+                    .. "seconds after leaving an instance. Recommended for "
+                    .. "Warcraft Recorder compatibility.",
+                AUTO_LOGGING = "Automatically starts and stops combat logging "
+                    .. "when entering or leaving a loggable instance.",
+                AUTO_REPAIR = "Automatically repairs damaged equipment when "
+                    .. "opening a repair merchant. Guild repair funds are used "
+                    .. "when available.",
+            },
+        },
+    },
+
+    Messages = {
+        LOADED = " successfully loaded! ",
+        COMMAND_PREFIX = "Type ",
+        COMMAND_SEPARATOR = " or ",
+        COMMAND_SUFFIX = " to open the settings window.",
+        UI_UNAVAILABLE = ": UI module is unavailable.",
     },
 
     -- Constants used to identify supported instance difficulties and stop timing.
     CombatLogging = {
         DELAYED_STOP_SECONDS = 30,
         MESSAGE_COLOR = { 0.25, 0.65, 1 },
+        ENABLED_MESSAGE = "Log recording is enabled. Combat logs will be "
+            .. "automatically started and stopped when entering or leaving "
+            .. "selected instances.",
+        EMPTY_SUMMARY = "None",
+        SUMMARY_SEPARATOR = ", ",
+        INSTANCE_TYPES = {
+            PARTY = "party",
+            RAID = "raid",
+        },
+        TRIGGER_KEYS = {
+            MYTHIC_DUNGEON = "mythicDungeon",
+            MYTHIC_PLUS = "mythicplus",
+            MYTHIC_RAID = "mythicRaid",
+            HEROIC_RAID = "heroicRaid",
+            NORMAL_RAID = "normalRaid",
+            RAID_FINDER = "lfrRaid",
+            DELAYED_STOP = "delaystop",
+        },
+        TRIGGERS = {
+            { key = "mythicDungeon", text = "Mythic Dungeon" },
+            { key = "mythicplus", text = "Mythic+ Dungeon" },
+            { key = "mythicRaid", text = "Mythic Raid" },
+            { key = "heroicRaid", text = "Heroic Raid" },
+            { key = "normalRaid", text = "Normal Raid" },
+            { key = "lfrRaid", text = "Raid Finder" },
+        },
+        DEFAULTS = {
+            mythicDungeon = true,
+            mythicplus = true,
+            mythicRaid = true,
+            heroicRaid = true,
+            normalRaid = false,
+            lfrRaid = false,
+            delaystop = false,
+        },
         DIFFICULTY = {
             MYTHIC_DUNGEON = 23,
             MYTHIC_PLUS = 8,
@@ -192,6 +359,10 @@ SMhelper.Config = {
             RAID_FINDER = 17,
             LEGACY_RAID_FINDER = 7,
         },
+    },
+
+    AutoRepair = {
+        MIN_REPAIR_COST = 0,
     },
 
     -- Inline WoW color escape sequences for chat messages.
@@ -210,6 +381,7 @@ SMhelper.Config = {
         accent = { 0.20, 0.60, 1.00, 1 },
         text = { 0.92, 0.95, 1.00, 1 },
         mutedText = { 0.62, 0.68, 0.76, 1 },
+        tooltipTitle = { 1, 1, 1 },
         transparent = { 0, 0, 0, 0 },
         defaultTexture = { 1, 1, 1, 1 },
         toggleKnobEnabled = { 1, 1, 1, 1 },

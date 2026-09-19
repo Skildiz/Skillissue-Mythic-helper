@@ -4,6 +4,7 @@ local addonName, SMhelper = ...
 -- visibility, and active-page tracking, while navigation remains in Sidebar.
 SMhelper.UI.Content = SMhelper.UI.Content or {}
 local Content = SMhelper.UI.Content
+local FrameType = SMhelper.Config.UI.FrameTypes.FRAME
 local host
 local pages = {}
 local activeId
@@ -11,7 +12,7 @@ local activeId
 -- Create the shared content frame once.
 function Content:Create(parent)
     if host then return host end
-    host = CreateFrame("Frame", nil, parent)
+        host = CreateFrame(FrameType, nil, parent)
     return host
 end
 
